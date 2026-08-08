@@ -62,12 +62,14 @@ imports `torch` itself (`wrap_dopfn.py`), which would defeat the whole
 point of this cell if it ran second.
 
 - **On Colab**: pins `torch==2.9.1` (verified compatible with Do-PFN) via a
-  plain `pip install`. As long as this is the first cell you run, **no
-  restart needed** -- Colab ships torch preinstalled but never auto-imports
-  it, so nothing has loaded the incompatible version into memory yet; the
-  freshly installed one is just what later cells pick up. (If you'd already
-  run other cells before this one, torch may already be in memory -- restart
-  the runtime and re-run from the top.)
+  plain `pip install` -- **can take up to a minute or so** (torch is a large
+  package; network speed is the bottleneck, not this notebook). As long as
+  this is the first cell you run, **no restart needed** -- Colab ships torch
+  preinstalled but never auto-imports it, so nothing has loaded the
+  incompatible version into memory yet; the freshly installed one is just
+  what later cells pick up. (If you'd already run other cells before this
+  one, torch may already be in memory -- restart the runtime and re-run from
+  the top.)
 - **Locally (this repo's `uv` venv)**: `pip` isn't available inside the
   notebook, so this only detects the problem. Fix in a terminal:
   `uv pip install "torch==2.9.1"`, then restart the kernel.
@@ -102,8 +104,8 @@ def _torch_needs_downgrade():
 if not _torch_needs_downgrade():
     print("OK -- torch version is compatible with Do-PFN (or not installed yet).")
 elif IN_COLAB:
-    print(f"torch >= 2.10 detected -- installing torch=={TORCH_PIN}...")
-    subprocess.run([sys.executable, "-m", "pip", "install", "-q", f"torch=={TORCH_PIN}"], check=True)
+    print(f"torch >= 2.10 detected -- installing torch=={TORCH_PIN} (can take a minute)...")
+    get_ipython().system(f"pip install -q torch=={TORCH_PIN}")
     print("OK -- done. If this was the first cell you ran, no restart needed -- "
           "continue to the next cell.")
 else:
