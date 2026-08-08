@@ -61,27 +61,23 @@ particular before `causal_bench` gets imported below, since it transitively
 imports `torch` itself (`wrap_dopfn.py`), which would defeat the whole
 point of this cell if it ran second.
 
-- **On Colab, fresh runtime (the common case)**: reads the installed
-  torch version from package metadata *without importing torch* (Colab
-  ships `torch>=2.10` preinstalled but never auto-imports it), then
-  `pip install`s `torch<2.10` in place. Since torch was never loaded into
-  this process, **no restart is needed** — just continue to the next cell.
-- **On Colab, if torch was already imported this session** (e.g. you're
-  re-running after already running the notebook once): unavoidable now —
-  nothing can un-import an already-loaded compiled extension. Restarts via
-  Colab's own restart API, which isn't always reliable in practice
-  (verified directly) — if nothing happens within a few seconds, use
-  **Runtime > Restart session** yourself, then re-run this cell, then
-  continue from the top.
+- **On Colab**: pins `torch==2.9.1` (verified compatible with Do-PFN) via a
+  plain `pip install`. As long as this is the first cell you run, **no
+  restart needed** -- Colab ships torch preinstalled but never auto-imports
+  it, so nothing has loaded the incompatible version into memory yet; the
+  freshly installed one is just what later cells pick up. (If you'd already
+  run other cells before this one, torch may already be in memory -- restart
+  the runtime and re-run from the top.)
 - **Locally (this repo's `uv` venv)**: `pip` isn't available inside the
   notebook, so this only detects the problem. Fix in a terminal:
-  `uv pip install "torch<2.10"`, then restart the kernel.
+  `uv pip install "torch==2.9.1"`, then restart the kernel.
 - Not planning to run Do-PFN? Skip — CausalPFN and CausalFM work fine on any
   recent torch."""),
 
     code("""import sys, os, subprocess, importlib.metadata
 
 IN_COLAB = "google.colab" in sys.modules
+TORCH_PIN = "2.9.1"  # last version verified compatible with Do-PFN (torch>=2.10 breaks it)
 
 def _restart_colab_kernel():
     # google.colab.kernel.restart() is Colab's own restart API -- the same
@@ -89,45 +85,32 @@ def _restart_colab_kernel():
     # restarts the process, but Colab's frontend doesn't recognize it as an
     # intentional restart and reports "session crashed" instead (verified
     # directly). Either way execution can't resume on its own afterward, and
-    # this API itself isn't always reliable (also verified directly).
+    # this API itself isn't always reliable (also verified directly). Used
+    # below only for the (rarer) stale-causal_bench-import case -- the torch
+    # check itself avoids needing a restart at all, see next cell.
     from IPython.display import Javascript, display
     display(Javascript("google.colab.kernel.restart()"))
 
-def _installed_torch_version():
+def _torch_needs_downgrade():
     try:
-        return importlib.metadata.version("torch")  # reads metadata, doesn't import torch
+        v = importlib.metadata.version("torch")  # reads metadata, doesn't import torch
     except importlib.metadata.PackageNotFoundError:
-        return None  # not installed yet -- nothing to fix here
+        return False  # not installed yet -- nothing to fix here
+    major, minor = (int(p) for p in v.split("+")[0].split(".")[:2])
+    return (major, minor) >= (2, 10)
 
-def _version_lt_2_10(version_str):
-    major, minor = (int(p) for p in version_str.split("+")[0].split(".")[:2])
-    return (major, minor) < (2, 10)
-
-_torch_version = _installed_torch_version()
-_torch_needs_downgrade = _torch_version is not None and not _version_lt_2_10(_torch_version)
-
-if not _torch_needs_downgrade:
+if not _torch_needs_downgrade():
     print("OK -- torch version is compatible with Do-PFN (or not installed yet).")
-elif not IN_COLAB:
-    print(f"torch {_torch_version} is >= 2.10 -- Do-PFN will fail to import.")
-    print('Fix, in a terminal (not this notebook -- local uv venv has no pip):')
-    print('    uv pip install "torch<2.10"')
-    print("then restart this notebook's kernel and re-run from the top.")
-elif "torch" not in sys.modules:
-    # Colab, not imported yet -- fix in place, no restart needed.
-    print(f"torch {_torch_version} installed but not yet imported -- "
-          "installing torch<2.10 in place (no restart needed)...")
-    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "torch<2.10"], check=True)
-    print("OK -- done, continue to the next cell.")
+elif IN_COLAB:
+    print(f"torch >= 2.10 detected -- installing torch=={TORCH_PIN}...")
+    subprocess.run([sys.executable, "-m", "pip", "install", "-q", f"torch=={TORCH_PIN}"], check=True)
+    print("OK -- done. If this was the first cell you ran, no restart needed -- "
+          "continue to the next cell.")
 else:
-    # Colab, already imported -- restart is unavoidable.
-    print(f"torch {_torch_version} is already imported in this session -- installing "
-          "torch<2.10 and restarting (unavoidable once torch has been imported)...")
-    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "torch<2.10"], check=True)
-    _restart_colab_kernel()
-    print("Restart requested. If nothing happens within a few seconds, use "
-          "Runtime > Restart session yourself, then re-run this cell -- it "
-          "should print OK -- then continue from the top.")"""),
+    print("torch >= 2.10 detected -- Do-PFN will fail to import.")
+    print('Fix, in a terminal (not this notebook -- local uv venv has no pip):')
+    print(f'    uv pip install "torch=={TORCH_PIN}"')
+    print("then restart this notebook's kernel and re-run from the top.")"""),
 
     md("""## 2. Setup
 
