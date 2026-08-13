@@ -163,3 +163,89 @@ your "ground truth" was actually measured independently (e.g., from a
 randomized experiment, like here) or whether it's silently derived from the
 same confounded data your models are being scored on. The latter isn't a
 ground truth at all — it's the bias you're trying to measure.
+
+## Two Lalonde benchmarks in this repo: real NBER data vs. RealCause semi-synthetic
+
+Everything above describes `load_lalonde()` — the real NBER Lalonde data, sections
+3–7 of `Lalonde_benchmark.ipynb`. If you compare its numbers directly against
+CausalPFN's own published Lalonde results (paper: arXiv:2506.07918; repo:
+`github.com/vdblm/CausalPFN`), **they won't match, and that's expected** — the two
+setups are testing genuinely different things. Sections 8–10 of the notebook add a
+second Lalonde benchmark, `load_lalonde_realcause()`, that replicates CausalPFN's
+actual methodology so its numbers *are* directly comparable to their Table 1.
+
+### Why the two disagree
+
+CausalPFN's paper does not score Lalonde on the real NBER data at all. It uses
+**RealCause** (Neal, Huang & Raghupathi, 2020, arXiv:2011.15007): a method that fits
+a generative model to a real dataset's covariate/treatment/outcome distribution, then
+*simulates* new potential outcomes `y0`/`y1` from that fitted model. The real
+covariates and treatment assignment are preserved, but the outcomes — and therefore
+the individual treatment effect `ite = y1 - y0` — are simulated, not observed. This
+is what makes individual-level CATE ground truth possible at all, which is
+structurally impossible on real data (see "What was wrong before, and the fix"
+above — real data only ever gives you one of `y0`/`y1` per unit, never both).
+
+| | `load_lalonde()` (sections 3–7) | `load_lalonde_realcause()` (sections 8–10) |
+|---|---|---|
+| Data | Real NBER data: NSW-treated vs. PSID-controls | RealCause semi-synthetic realizations of real Lalonde covariates (PSID and CPS cohorts) |
+| Outcomes | Real, observed `re78` | Simulated `y0`/`y1`, drawn from a generative model fit to the real data |
+| Ground truth | Population-level ATE only, from a *separate* randomized experiment (NSW vs. NSW-control) | Known **per-unit** ITE for every unit (the `ite` column) |
+| CATE ground truth | None — impossible on real data | Yes — this is what makes PEHE computable at all |
+| Repetition | Single fixed dataset | Averaged over 10 repeated realizations (of 100 available) |
+| Reported metric | ATE abs/rel error only | Mean PEHE ± SEM and mean ATE relative error ± SEM, across realizations |
+| Difficulty | Real, severe selection bias + poor covariate overlap (see above) | Whatever bias/overlap the fitted generative model reproduces — a different, and on this data an easier, problem |
+
+Neither is "more correct" than the other — they're standard, complementary ways to
+evaluate causal estimators on real-world-shaped data. The real-data benchmark tests
+whether a method can recover a *known-true, independently-measured* population ATE
+under genuine, unmodified confounding. The RealCause benchmark tests whether a method
+can recover *individual-level* effects when the ground truth is simulated but the
+covariate/treatment structure is real — the standard way papers like CausalPFN's
+report CATE accuracy at all, since real data can never supply that ground truth.
+
+### What "realizations" means
+
+RealCause fits one generative model per cohort (PSID or CPS) to the real
+covariate/treatment/outcome distribution. Each "realization" is one independent
+*sample* drawn from that fitted model — the same real covariates and treatment
+assignment every time, but a different simulated draw of `y0`/`y1` (and therefore a
+different `ite`) each time. CausalPFN's repo ships 100 such pre-computed realizations
+per cohort as flat CSVs (`benchmarks/realcause_datasets/lalonde_{cohort}_sample{i}.csv`,
+`i=0..99`) — this is the same role IHDP's 100 fixed realizations play in that
+benchmark: it turns one noisy point estimate into a distribution over draws, so a
+single lucky or unlucky simulated dataset doesn't dominate the reported number. The
+paper's Table 1 uses "the first 10 realizations" of each cohort, averaged as
+mean ± SEM; `load_lalonde_realcause(..., n_realizations=10)` (the default) matches
+this exactly.
+
+### Where the data comes from, and how it's scored
+
+`causal_bench/data_loader.py::load_lalonde_realcause()` downloads (and locally
+caches, like `load_lalonde()` does) the CSVs directly from `vdblm/CausalPFN`'s own
+repo — the literal artifacts their reported numbers were computed from — rather than
+re-running RealCause's own generative-model-fitting pipeline from scratch. Train/test
+split and ATE ground truth replicate CausalPFN's own
+`benchmarks/realcause.py::RealCauseDataset._get_data` exactly, verified directly
+against that source:
+
+- Per realization: `np.random.default_rng(seed + i)` (default `seed=42`), permute
+  all rows, first 90% → train (fit the CATE model on this), held-out 10% → test
+  (score PEHE only on these, against their true `ite`).
+- `ate_true` is `ite.mean()` over **all** rows (train+test combined) — CausalPFN's
+  own evaluation notebook (`notebooks/causal_effect_full.ipynb`) fits a *separate*
+  model instance on the full realization data for the ATE metric, rather than
+  reusing the CATE model's train-only fit. `Lalonde_benchmark.ipynb`'s section 9
+  does the same: two fresh model instances per realization per method, one fit on
+  the 90% train split (for PEHE), one fit on the full data (for ATE).
+
+### Reference numbers (CausalPFN, from the paper's Table 1)
+
+| Cohort | Mean PEHE | Mean ATE relative error |
+|---|---|---|
+| Lalonde PSID | 13.98 ± 0.43 | 0.20 ± 0.03 |
+| Lalonde CPS | 8.83 ± 0.04 | 0.08 ± 0.02 |
+
+If your own CausalPFN run through `Lalonde_benchmark.ipynb`'s section 10 lands in
+this range, your RealCause setup is working correctly — the same sanity-check role
+the "Verified reference run" table above plays for the real-data benchmark.

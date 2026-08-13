@@ -4,7 +4,13 @@ from .data_generators import (
     list_datasets,
     GENERATORS,
 )
-from .data_loader import load_lalonde, LalondeDataset, list_available_datasets
+from .data_loader import (
+    load_lalonde,
+    LalondeDataset,
+    list_available_datasets,
+    load_lalonde_realcause,
+    RealCauseLalondeRealization,
+)
 from .metrics import evaluate_cate, pehe, ate_abs_error, ate_rel_error, bias, coverage_95
 from .wrap_causalpfn import CausalPFNWrapper
 from .wrap_dopfn import DoPFNWrapper
@@ -27,6 +33,8 @@ __all__ = [
     "load_lalonde",
     "LalondeDataset",
     "list_available_datasets",
+    "load_lalonde_realcause",
+    "RealCauseLalondeRealization",
     "evaluate_cate",
     "pehe",
     "ate_abs_error",
