@@ -212,3 +212,140 @@ def list_available_datasets() -> list:
         "lalonde_nsw_psid",
         "lalonde_nsw_psid_trimmed",
     ]
+
+
+# ============================================================================
+# RealCause-based Lalonde (semi-synthetic, matches CausalPFN's own benchmark)
+# ============================================================================
+#
+# `load_lalonde()` above uses the *real* NBER Lalonde data, with only a
+# population-level ATE (from a separate randomized experiment) as ground
+# truth -- there is no individual-level CATE ground truth on real data at
+# all. CausalPFN's own paper (arXiv:2506.07918) and repo (github.com/vdblm/
+# CausalPFN) score Lalonde completely differently: they use RealCause (Neal
+# et al. 2020, arXiv:2011.15007), which fits a generative model to the real
+# Lalonde covariates/treatment/outcome distribution and then *simulates*
+# potential outcomes y0/y1 from it. Each independent sample from that fitted
+# model is a "realization" -- same real covariates and treatment assignment
+# every time, but a different simulated draw of y0/y1 (and therefore a
+# different individual treatment effect, `ite = y1 - y0`) each time. This
+# is what makes individual-level CATE ground truth possible at all here,
+# unlike on the real NBER data. See docs/LALONDE_DATASET.md for the full
+# comparison between the two Lalonde benchmarks in this repo.
+#
+# CausalPFN's repo ships 100 pre-computed realizations each for the PSID
+# and CPS cohorts as flat CSVs (verified directly by downloading and
+# inspecting them): benchmarks/realcause_datasets/lalonde_{cohort}_sample{i}.csv,
+# columns `age,education,black,hispanic,married,nodegree,re74,re75,t,y,y0,y1,ite`
+# (i=0..99). The paper's Table 1 numbers are "the first 10 realizations" of
+# each, averaged (mean +/- SEM) -- this loader defaults to the same 10 for
+# direct comparability. Downloaded from CausalPFN's own repo rather than
+# re-run through RealCause's own generative-model-fitting pipeline, since
+# these are the literal artifacts the paper's reported numbers came from.
+#
+# Train/test split and ATE ground truth replicate CausalPFN's own
+# `benchmarks/realcause.py::RealCauseDataset._get_data` exactly (verified
+# directly against that source): `np.random.default_rng(seed + i)` per
+# realization, permute all rows, first `1 - test_ratio` -> train (used to
+# fit the CATE model), held-out `test_ratio` -> test (only these are scored
+# for PEHE, against their `ite`). `ate_true` is `ite.mean()` over *all* rows
+# (train+test combined) -- CausalPFN's own evaluation loop
+# (notebooks/causal_effect_full.ipynb) fits a *separate* model on the full
+# realization data for the ATE metric, rather than reusing the CATE model's
+# train-only fit.
+
+_REALCAUSE_BASE = (
+    "https://raw.githubusercontent.com/vdblm/CausalPFN/main/"
+    "benchmarks/realcause_datasets/"
+)
+_REALCAUSE_FEATURE_COLS = ["age", "educ", "black", "hisp", "married", "nodegree", "re74", "re75"]
+# Raw CSV header uses "education"/"hispanic" -- renamed here to match this
+# repo's existing `_FEATURE_COLS` naming convention above.
+_REALCAUSE_RAW_COLS = ["age", "education", "black", "hispanic", "married", "nodegree", "re74", "re75"]
+
+
+@dataclass
+class RealCauseLalondeRealization:
+    cohort: str
+    realization: int
+    X_train: np.ndarray
+    T_train: np.ndarray
+    Y_train: np.ndarray
+    X_test: np.ndarray
+    tau_true_test: np.ndarray   # true ITE on the held-out test units -- for PEHE
+    X_full: np.ndarray
+    T_full: np.ndarray
+    Y_full: np.ndarray
+    ate_true: float             # ite.mean() over all (train+test) units
+    meta: Dict[str, Any]
+
+
+def _load_realcause_csv(cohort: str, i: int) -> pd.DataFrame:
+    cache_path = os.path.join(_CACHE_DIR, f"realcause_lalonde_{cohort}_sample{i}.csv")
+    if os.path.exists(cache_path):
+        return pd.read_csv(cache_path)
+
+    os.makedirs(_CACHE_DIR, exist_ok=True)
+    url = f"{_REALCAUSE_BASE}lalonde_{cohort}_sample{i}.csv"
+    try:
+        df = pd.read_csv(url)
+    except Exception as e:
+        raise RuntimeError(
+            f"Failed to download RealCause Lalonde data from {url}\n"
+            f"Error: {e}\n"
+            f"Check your internet connection or manually place a CSV at: {cache_path}"
+        )
+    df.to_csv(cache_path, index=False)
+    return df
+
+
+def load_lalonde_realcause(
+    cohort: str = "psid",
+    n_realizations: int = 10,
+    seed: int = 42,
+    test_ratio: float = 0.1,
+) -> list:
+    """
+    Load `n_realizations` RealCause semi-synthetic realizations of the
+    Lalonde `cohort` ("psid" or "cps"), replicating CausalPFN's own
+    evaluation setup (see module docstring above / docs/LALONDE_DATASET.md).
+
+    Returns a list[RealCauseLalondeRealization] of length `n_realizations`
+    (the first N of the 100 available, matching the paper's "first 10").
+    """
+    if cohort not in ("psid", "cps"):
+        raise ValueError(f"Unknown RealCause Lalonde cohort '{cohort}'. Choose from: ['psid', 'cps']")
+
+    realizations = []
+    for i in range(n_realizations):
+        df = _load_realcause_csv(cohort, i)
+        df.columns = _REALCAUSE_RAW_COLS + ["t", "y", "y0", "y1", "ite"]
+
+        X = df[_REALCAUSE_RAW_COLS].values.astype(np.float32)
+        T = df["t"].values.astype(np.float32)
+        Y = df["y"].values.astype(np.float32)
+        ite = df["ite"].values.astype(np.float32)
+
+        rng = np.random.default_rng(seed + i)
+        idx = rng.permutation(len(df))
+        split_idx = int(len(idx) * (1 - test_ratio))
+        train_idx, test_idx = idx[:split_idx], idx[split_idx:]
+
+        realizations.append(RealCauseLalondeRealization(
+            cohort=cohort,
+            realization=i,
+            X_train=X[train_idx], T_train=T[train_idx], Y_train=Y[train_idx],
+            X_test=X[test_idx], tau_true_test=ite[test_idx],
+            X_full=X, T_full=T, Y_full=Y,
+            ate_true=float(ite.mean()),
+            meta=dict(
+                source="RealCause (Neal et al. 2020) via vdblm/CausalPFN",
+                cohort=cohort,
+                realization=i,
+                n_samples=len(df),
+                n_train=len(train_idx),
+                n_test=len(test_idx),
+                feature_names=_REALCAUSE_FEATURE_COLS,
+            ),
+        ))
+    return realizations
