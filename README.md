@@ -1,24 +1,24 @@
 # Causal Foundation Models — Benchmark Suite
 
-Companion code for the survey on **causal foundation models** (prior-fitted networks that use in-context learning to estimate causal quantities on new datasets). Compare three recent causal foundation models (CFMs) against six traditional metalearners on synthetic and real-world causal inference benchmarks.
+Companion code for the survey on **causal foundation models** (prior-fitted networks that use in-context learning to estimate causal quantities on new datasets). In this repo, we compare three recent causal foundation models (CFMs) against six traditional metalearners on synthetic and real-world causal inference benchmarks.
 
 ## Models Included
 
 ### Foundation Models (In-Context Learning)
 | Model | Paper | Code |
 |---|---|---|
-| **CausalPFN** | Balazadeh, Kamkari et al., *CausalPFN: Amortized Causal Effect Estimation via In-Context Learning*, arXiv:2506.07918 | [vdblm/CausalPFN](https://github.com/vdblm/CausalPFN) |
-| **Do-PFN** | Robertson, Reuter et al., *Do-PFN: In-Context Learning for Causal Effect Estimation*, arXiv:2506.06039 | [jr2021/Do-PFN](https://github.com/jr2021/Do-PFN) |
-| **CausalFM** | Ma, Frauen, Javurek & Feuerriegel, *Foundation Models for Causal Inference via Prior-Data Fitted Networks*, arXiv:2506.10914 (ICLR 2026) | [yccm/CausalFM-toolkit](https://github.com/yccm/CausalFM-toolkit) |
+| **CausalPFN** | Balazadeh, Kamkari et al., *CausalPFN: Amortized Causal Effect Estimation via In-Context Learning*, NeurIPS 2025 | [vdblm/CausalPFN](https://github.com/vdblm/CausalPFN) |
+| **Do-PFN** | Robertson, Reuter et al., *Do-PFN: In-Context Learning for Causal Effect Estimation*, NeurIPS 2025 | [jr2021/Do-PFN](https://github.com/jr2021/Do-PFN) |
+| **CausalFM** | Ma, Frauen, et al., *Foundation Models for Causal Inference via Prior-Data Fitted Networks*, ICLR 2026 | [yccm/CausalFM-toolkit](https://github.com/yccm/CausalFM-toolkit) |
 
 ### Metalearners (from econml)
 | Method | Description |
 |---|---|
-| **S-learner** | Single-model learner: trains one model on X + T |
-| **T-learner** | Two-model learner: separate models for each treatment group |
+| **S-learner** | Single-model learner: trains one model on covariates + treatment |
+| **T-learner** | Two-model learner: separate models for each binary treatment group |
 | **X-learner** | Cross-fit learner: asymptotically efficient variant |
 | **Debiased ML** | Neyman-orthogonal approach, robust to nuisance parameter estimation |
-| **IPW** | Inverse Probability Weighting based on propensity scores |
+| **IPW** | Inverse Probability Weighting: based on propensity scores |
 | **DR** | Doubly Robust: combines outcome and propensity modeling |
 
 ## Quick Start
@@ -33,21 +33,21 @@ uv sync
 pip install -r requirements.txt
 ```
 
-### 2. Foundation Models Quickstart (recommended first step)
+### 2. Causal Foundation Model Quickstart
 
 ```bash
 jupyter notebook notebooks/Foundation_models_quickstart.ipynb
 ```
 
-The fastest path to one working causal foundation model: install, fit, predict — done. Covers **CausalPFN** alone, end to end, called through its own native API (no wrapper abstraction), so every cell is exactly what you'd write in your own project.
+The fastest path to working with one causal foundation model. Simply install, load your data, split into context and query, then predict — done. No training required for each new inference dataset.
 
-### 3. Foundation Models Sandbox (all three models, side by side)
+### 3. Foundation Models Sandbox
 
 ```bash
 jupyter notebook notebooks/Foundation_models_sandbox.ipynb
 ```
 
-A playground/sandbox notebook, not a quickstart. Runs all three causal foundation models (CausalPFN, Do-PFN, CausalFM) side by side on one dataset, each called through its own native API. It's checked into git to preserve the observations, caveats, and gotchas (version pins, macOS segfaults, checkpoint paths, etc.) found while exploring all three. Includes a "Reference output" section with real numbers and a plot from a verified run, so you can check your own results against a known-good one.
+A playground/sandbox notebook. Runs three causal foundation models (CausalPFN, Do-PFN, CausalFM) side-by-side on one dataset, each called through its own native API. Includes basic evaluation and plotting code so that you can quickly experiment and learn about each CFM's properties.
 
 ### 4. Lalonde Benchmark
 
@@ -55,7 +55,7 @@ A playground/sandbox notebook, not a quickstart. Runs all three causal foundatio
 jupyter notebook notebooks/Lalonde_benchmark.ipynb
 ```
 
-Compare all three foundation models against all six metalearners on the Lalonde real-world benchmark, using this repo's `causal_bench` wrappers. Each model runs independently — one failing or unavailable doesn't block the rest.
+Compare three causal foundation models against six causal metalearners on the real-world Lalonde benchmark, using this repo's `causal_bench` wrappers. Models are compared head-to-head on a lightweight but practical task.
 
 ## Repository Structure
 
@@ -66,9 +66,9 @@ Compare all three foundation models against all six metalearners on the Lalonde 
 │   ├── data_generators.py                  # 4 synthetic datasets (linear, nonlinear, IV, frontdoor)
 │   ├── data_loader.py                      # Load Lalonde real-world benchmark
 │   ├── metrics.py                          # PEHE, ATE error, bias, coverage, etc.
+│   ├── wrap_causalfm.py                    # CausalFM wrapper
 │   ├── wrap_causalpfn.py                   # CausalPFN wrapper
 │   ├── wrap_dopfn.py                       # Do-PFN wrapper
-│   ├── wrap_causalfm.py                    # CausalFM wrapper
 │   └── wrap_metalearners.py                # S/T/X-learner, Debiased ML, IPW, DR wrappers
 ├── notebooks/
 │   ├── Foundation_models_quickstart.ipynb  # CausalPFN alone, end to end (hand-maintained)
@@ -181,11 +181,17 @@ Each notebook includes an "Open in Colab" badge. Click it to run directly on Col
 
 ## Citation
 
-If you use this code in research, please cite the relevant papers:
-- CausalPFN: Balazadeh et al., arXiv:2506.07918
-- Do-PFN: Robertson et al., arXiv:2506.06039
-- CausalFM: Ma et al., arXiv:2506.10914
+If you find this code and survey helpful, please cite the paper as follows
+
+```bibtex
+@article{stith2026cfm,
+  title={Causal Foundation Models},
+  author={Stith, Christopher and Rahmani, Hossein and Cresswell, Jesse C},
+  journal={arXiv:2609.XXXXX},
+  year={2026}
+}
+```
 
 ## License
 
-MIT
+This code is licensed under the MIT License, copyright by Layer 6 AI.
