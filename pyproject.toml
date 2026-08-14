@@ -21,7 +21,7 @@ dependencies = [
     "ipywidgets>=8.0.0",
     "nbformat",
     "jupyter",
-    "torch",
+    "torch<2.10",
     "causalpfn",
 ]
 
