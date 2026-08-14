@@ -13,7 +13,7 @@ import os
 OUT_DIR = "notebooks"
 os.makedirs(OUT_DIR, exist_ok=True)
 
-REPO_SLUG = "chris-L6/causalfm-survey"
+REPO_SLUG = "layer6ai-labs/causalfm-survey"
 
 
 def colab_badge(notebook_path):
@@ -137,7 +137,7 @@ if "causal_bench" in sys.modules:
 GITHUB_TOKEN = ""
 # ──────────────────────────────────────────────────────────────────────────────
 
-REPO_SLUG = "chris-L6/causalfm-survey"
+REPO_SLUG = "layer6ai-labs/causalfm-survey"
 REPO_DIR  = "causalfm-survey"
 
 if IN_COLAB:
