@@ -7,7 +7,7 @@ name = "causal-fm-survey"
 version = "0.1.0"
 description = "Benchmark companion code for survey on causal foundation models (CausalPFN, Do-PFN, CausalFM) vs. traditional metalearners"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.10,<3.13"
 authors = [
     { name = "Causal ML Community", email = "causal@example.com" },
 ]
