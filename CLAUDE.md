@@ -45,7 +45,7 @@ There's no dedicated setup/data notebook — synthetic dataset generation is inl
 
 ### Running notebooks
 
-Three notebooks, no numeric ordering — pick based on what you need:
+Four notebooks, no numeric ordering — pick based on what you need:
 
 **1. Foundation Models Quickstart** (fastest path to one working model):
 ```bash
@@ -54,17 +54,24 @@ jupyter notebook notebooks/Foundation_models_quickstart.ipynb
 - Covers **CausalPFN** alone, end to end: install, fit, predict. Standalone — calls CausalPFN's native API directly, not this repo's wrapper classes, so any cell can be copied into another project as-is.
 - Deliberately narrow (one model, one dataset) — see the sandbox notebook below for a three-model comparison.
 
-**2. Lalonde Benchmark** (compare all foundation models vs. all metalearners):
+**2. Lalonde Benchmark** (compare all foundation models vs. all metalearners, real data):
 ```bash
 jupyter notebook notebooks/Lalonde_benchmark.ipynb
 ```
-- Runs all 3 foundation models (CausalPFN, Do-PFN, CausalFM) + all 6 metalearners on Lalonde, no selection needed
+- Runs all 3 foundation models (CausalPFN, Do-PFN, CausalFM) + all 6 metalearners on the real NBER Lalonde data (`load_lalonde`), no selection needed
 - Each model runs independently — an unavailable or erroring model is skipped/reported without blocking the rest
-- Uses `causal_bench` wrappers (unlike the other two notebooks, which call each library's native API directly)
-- Sections 1–7: real NBER Lalonde data (`load_lalonde`) — results table (ATE error, relative error, runtime) and bar chart
-- Sections 8–10: a second, additional benchmark on RealCause semi-synthetic Lalonde realizations (`load_lalonde_realcause`), replicating CausalPFN's own paper methodology (PSID + CPS cohorts, 10 realizations each, PEHE + ATE relative error) so results are directly comparable to CausalPFN's Table 1 — see [`docs/LALONDE_DATASET.md`](docs/LALONDE_DATASET.md) for why these two benchmarks disagree and shouldn't be compared to each other directly
+- Uses `causal_bench` wrappers (unlike the quickstart/sandbox notebooks, which call each library's native API directly)
+- Results table (ATE error, relative error, runtime) and bar chart, scored against a true experimental ATE — but no CATE ground truth (impossible on real data); see [`docs/LALONDE_DATASET.md`](docs/LALONDE_DATASET.md)
 
-**3. Foundation Models Sandbox** (practitioner playground, no `causal_bench` wrappers):
+**3. RealCause Benchmark** (same 9 models, matches CausalPFN's own paper methodology):
+```bash
+jupyter notebook notebooks/RealCause_benchmark.ipynb
+```
+- Same 3 foundation models + 6 metalearners, on RealCause semi-synthetic Lalonde realizations (`load_lalonde_realcause`) instead of real data — PSID + CPS cohorts, 10 realizations each, PEHE + ATE relative error, directly comparable to CausalPFN's Table 1
+- Shares its environment-check/setup/Do-PFN+CausalFM-install cells with `Lalonde_benchmark.ipynb` (both built from the same `env_and_setup_cells()` helper in `scripts/build_new_notebooks.py`) but is otherwise a separate, standalone notebook — not a set of extra cells appended to the Lalonde one
+- See [`docs/LALONDE_DATASET.md`](docs/LALONDE_DATASET.md) for why this and `Lalonde_benchmark.ipynb` disagree and shouldn't be compared to each other directly
+
+**4. Foundation Models Sandbox** (practitioner playground, no `causal_bench` wrappers):
 ```bash
 jupyter notebook notebooks/Foundation_models_sandbox.ipynb
 ```
@@ -78,7 +85,7 @@ jupyter notebook notebooks/Foundation_models_sandbox.ipynb
 If you modify the notebook generator scripts, regenerate:
 
 ```bash
-python scripts/build_new_notebooks.py   # writes notebooks/Lalonde_benchmark.ipynb
+python scripts/build_new_notebooks.py   # writes notebooks/Lalonde_benchmark.ipynb and notebooks/RealCause_benchmark.ipynb
 ```
 
 Before publishing to Colab: update `REPO_SLUG` in `build_new_notebooks.py` with your GitHub `owner/repo`.
@@ -149,9 +156,14 @@ class *Wrapper:
 - Not built by `scripts/build_new_notebooks.py`; hand-maintained like the sandbox notebook below, since it doesn't share the Lalonde notebook's wrapper-based structure
 
 **`Lalonde_benchmark.ipynb`** — Real-world comparison, uses `causal_bench`
-- Automatically runs all 3 foundation models + all 6 metalearners on Lalonde, no selection needed
+- Automatically runs all 3 foundation models + all 6 metalearners on the real NBER Lalonde data, no selection needed
 - Unavailable/erroring models are skipped/reported per-model, without blocking the rest
 - Produces results table (ATE error, runtime) and bar charts
+- Built by `scripts/build_new_notebooks.py` — edit the script, not the `.ipynb`, then regenerate
+
+**`RealCause_benchmark.ipynb`** — Same 9 models on RealCause semi-synthetic realizations, uses `causal_bench`
+- Replicates CausalPFN's own paper methodology so results are directly comparable to their Table 1 (see `docs/LALONDE_DATASET.md`)
+- Shares the same environment-check/setup/Do-PFN+CausalFM-install cells as `Lalonde_benchmark.ipynb` (both generated from the shared `env_and_setup_cells()` helper), but is a separate notebook with its own data loading, model registry, run loop, and results table
 - Built by `scripts/build_new_notebooks.py` — edit the script, not the `.ipynb`, then regenerate
 
 **`Foundation_models_sandbox.ipynb`** — Practitioner playground/sandbox, standalone
@@ -163,9 +175,9 @@ class *Wrapper:
 
 ### `scripts/`
 
-**`build_new_notebooks.py`** — Generates `notebooks/Lalonde_benchmark.ipynb`
-- Define notebook structure as Python code (using nbformat)
-- Re-run after editing the script to regenerate the `.ipynb` file
+**`build_new_notebooks.py`** — Generates `notebooks/Lalonde_benchmark.ipynb` and `notebooks/RealCause_benchmark.ipynb`
+- Define notebook structure as Python code (using nbformat); `env_and_setup_cells()` returns the environment-check/setup/Do-PFN+CausalFM-install cells shared by both notebooks, so a fix to that shared setup only needs to happen once
+- Re-run after editing the script to regenerate both `.ipynb` files
 - Does **not** build the quickstart or sandbox notebooks — those are hand-maintained (see above)
 
 ## Key caveats & usage notes
@@ -174,7 +186,7 @@ class *Wrapper:
 
 - **`iv_binary` / `frontdoor`**: Intentionally violate unconfoundedness-given-X. Methods that assume unconfoundedness will be biased (expected behavior, used to test robustness).
 - **Lalonde**: Real-world data with no ground-truth *CATE*, but `load_lalonde()` does supply a true experimental *ATE* (`ds.ate`, ~$1,794) from a randomized comparison that's separate from the (X, T, Y) fed to models — see `causal_bench/data_loader.py` for why, and the wrapper-standardization note below for why that matters for scoring foundation models fairly on it. `Lalonde_benchmark.ipynb` defaults to `variant="nsw_psid_trimmed"` (common propensity-score-support trimming of the PSID controls) rather than the untrimmed `"nsw_psid"` — the untrimmed pairing has so little covariate overlap that most models get the *sign* of the ATE wrong, not just the magnitude, which is a real property of the data, not a model failure to fix. Full explanation: [`docs/LALONDE_DATASET.md`](docs/LALONDE_DATASET.md).
-- **Lalonde numbers won't match CausalPFN's paper unless you use `load_lalonde_realcause()`**: CausalPFN's own reported Lalonde results are not computed on the real NBER data `load_lalonde()` loads — they use RealCause (Neal et al. 2020) semi-synthetic realizations (simulated potential outcomes over real covariates, giving individual-level CATE ground truth that real data can never supply), averaged over 10 realizations, for both PSID and CPS cohorts. `causal_bench/data_loader.py::load_lalonde_realcause(cohort, n_realizations=10)` downloads CausalPFN's own checked-in realization CSVs (`vdblm/CausalPFN` repo) and replicates their train/test split and CATE/ATE evaluation exactly; `Lalonde_benchmark.ipynb` sections 8–10 run all 9 models through it and report mean PEHE / mean ATE relative error ± SEM, directly comparable to the paper's Table 1. Full comparison of the two Lalonde benchmarks: [`docs/LALONDE_DATASET.md`](docs/LALONDE_DATASET.md#two-lalonde-benchmarks-in-this-repo-real-nber-data-vs-realcause-semi-synthetic).
+- **Lalonde numbers won't match CausalPFN's paper unless you use `load_lalonde_realcause()`**: CausalPFN's own reported Lalonde results are not computed on the real NBER data `load_lalonde()` loads — they use RealCause (Neal et al. 2020) semi-synthetic realizations (simulated potential outcomes over real covariates, giving individual-level CATE ground truth that real data can never supply), averaged over 10 realizations, for both PSID and CPS cohorts. `causal_bench/data_loader.py::load_lalonde_realcause(cohort, n_realizations=10)` downloads CausalPFN's own checked-in realization CSVs (`vdblm/CausalPFN` repo) and replicates their train/test split and CATE/ATE evaluation exactly; `RealCause_benchmark.ipynb` runs all 9 models through it and reports mean PEHE / mean ATE relative error ± SEM, directly comparable to the paper's Table 1. Full comparison of the two Lalonde benchmarks: [`docs/LALONDE_DATASET.md`](docs/LALONDE_DATASET.md#two-lalonde-benchmarks-in-this-repo-real-nber-data-vs-realcause-semi-synthetic).
 
 ### Models & dependencies
 

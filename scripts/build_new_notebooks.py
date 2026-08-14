@@ -1,9 +1,11 @@
 """
-Builds the Lalonde benchmark notebook using nbformat.
+Builds notebooks using nbformat.
 Run: python3 scripts/build_new_notebooks.py
 
 Generates:
-- Lalonde_benchmark.ipynb (all 6 metalearners + all 3 foundation models on Lalonde)
+- Lalonde_benchmark.ipynb (all 6 metalearners + all 3 foundation models on real Lalonde data)
+- RealCause_benchmark.ipynb (same 9 models on RealCause semi-synthetic Lalonde realizations,
+  replicating CausalPFN's own paper methodology -- see docs/LALONDE_DATASET.md)
 """
 import nbformat as nbf
 import os
@@ -34,26 +36,13 @@ def save(nb, filename):
     print("wrote", path)
 
 
-# ============================================================================
-# Lalonde Benchmark (All Models)
-# ============================================================================
-nb = nbf.v4.new_notebook()
-nb.cells = [
-    md(f"""# Lalonde Benchmark: Foundation Models vs. Metalearners
-
-{colab_badge('notebooks/Lalonde_benchmark.ipynb')}
-
-**Compare all foundation models against all traditional metalearners on the Lalonde dataset.**
-
-This notebook runs:
-- 3 foundation models (CausalPFN, Do-PFN, CausalFM)
-- 6 metalearners (S-learner, T-learner, X-learner, Debiased ML, IPW, DR)
-
-on the Lalonde real-world causal inference benchmark and produces a comparison table. Each
-model runs independently and failures don't block the rest — unavailable or erroring
-models are reported and skipped."""),
-
-    md("""## 1. One-time environment check — needed for Do-PFN
+def env_and_setup_cells():
+    """Sections '1. One-time environment check' + '2. Setup': torch-version guard for
+    Do-PFN, causal_bench import/clone, econml+causalpfn install, Do-PFN/CausalFM clone
+    and extra deps. Identical prerequisites for every notebook that uses causal_bench's
+    foundation-model wrappers, so shared here rather than duplicated per notebook."""
+    return [
+        md("""## 1. One-time environment check — needed for Do-PFN
 
 Do-PFN's model code depends on an internal PyTorch name removed in
 `torch>=2.10`. **This must run first, before any other cell** — in
@@ -76,7 +65,7 @@ point of this cell if it ran second.
 - Not planning to run Do-PFN? Skip — CausalPFN and CausalFM work fine on any
   recent torch."""),
 
-    code("""import sys, os, subprocess, importlib.metadata
+        code("""import sys, os, subprocess, importlib.metadata
 
 IN_COLAB = "google.colab" in sys.modules
 TORCH_PIN = "2.9.1"  # last version verified compatible with Do-PFN (torch>=2.10 breaks it)
@@ -114,7 +103,7 @@ else:
     print(f'    uv pip install "torch=={TORCH_PIN}"')
     print("then restart this notebook's kernel and re-run from the top.")"""),
 
-    md("""## 2. Setup
+        md("""## 2. Setup
 
 If this is a fresh runtime, just run this cell normally. If you're
 re-running the notebook in a runtime that already ran it before (e.g. after
@@ -124,7 +113,7 @@ does -- Python caches imported modules in memory, so a `git pull` alone
 can't make an already-running session pick up code changes; only a restart
 can."""),
 
-    code("""# Python caches imported modules -- if causal_bench is already loaded, no
+        code("""# Python caches imported modules -- if causal_bench is already loaded, no
 # amount of re-cloning/pulling below will change what's in memory. Restart
 # is the only fix (Colab: automatic; locally: this cell raises instead).
 if "causal_bench" in sys.modules:
@@ -177,7 +166,7 @@ else:
 import causal_bench
 print("causal_bench imported from:", causal_bench.__file__)"""),
 
-    code("""# "pandas<2.4" pin: econml has no pandas upper bound, so pip's resolver
+        code("""# "pandas<2.4" pin: econml has no pandas upper bound, so pip's resolver
 # otherwise grabs the newest pandas (3.x) -- which conflicts with Colab's
 # preinstalled google-colab/cudf-cu12/dask-cudf-cu12 (all require pandas<2.4).
 %pip install -q econml causalpfn "pandas<2.4"
@@ -193,7 +182,7 @@ else:
     device = "cpu"
 print(f"Device: {device}")"""),
 
-    md("""### Do-PFN and CausalFM setup
+        md("""### Do-PFN and CausalFM setup
 
 Neither is on PyPI, so clone if missing and install just the extra deps each
 actually needs — **not** their bundled `requirements.txt` files, which are
@@ -202,7 +191,7 @@ no wheel for recent Python; CausalFM's snapshot has Linux/CUDA-only pins).
 CausalFM additionally needs its pretrained checkpoint, which ships inside the
 cloned repo at `checkpoints/checkpoints_standard/best_model.pth`."""),
 
-    code("""DOPFN_DIR = "Do-PFN"
+        code("""DOPFN_DIR = "Do-PFN"
 CAUSALFM_DIR = "CausalFM-toolkit"
 
 if not os.path.exists(DOPFN_DIR):
@@ -218,6 +207,36 @@ sys.path.insert(0, os.path.abspath(CAUSALFM_DIR))
 if IN_COLAB:
     get_ipython().system('pip install -q networkx tqdm einops "tabpfn==2.0.9" tensorboard')
 # Locally: uv pip install networkx tqdm einops "tabpfn==2.0.9" tensorboard"""),
+    ]
+
+
+# ============================================================================
+# Lalonde Benchmark (All Models, real NBER data)
+# ============================================================================
+nb = nbf.v4.new_notebook()
+nb.cells = [
+    md(f"""# Lalonde Benchmark: Foundation Models vs. Metalearners
+
+{colab_badge('notebooks/Lalonde_benchmark.ipynb')}
+
+**Compare all foundation models against all traditional metalearners on the Lalonde dataset.**
+
+This notebook runs:
+- 3 foundation models (CausalPFN, Do-PFN, CausalFM)
+- 6 metalearners (S-learner, T-learner, X-learner, Debiased ML, IPW, DR)
+
+on the Lalonde real-world causal inference benchmark and produces a comparison table. Each
+model runs independently and failures don't block the rest — unavailable or erroring
+models are reported and skipped.
+
+This uses the real NBER Lalonde data, which only has a true experimental **ATE** to check
+against — no individual-level CATE ground truth is possible on real data. For a companion
+benchmark that replicates CausalPFN's own paper methodology (RealCause semi-synthetic
+realizations, individual-level CATE ground truth, directly comparable to their Table 1), see
+`RealCause_benchmark.ipynb`. See `docs/LALONDE_DATASET.md` for why the two aren't directly
+comparable to each other."""),
+
+    *env_and_setup_cells(),
 
     md("""## 3. Load Lalonde Dataset
 
@@ -467,6 +486,197 @@ not just the magnitude."""),
 ]
 
 save(nb, "Lalonde_benchmark.ipynb")
+
+
+# ============================================================================
+# RealCause Lalonde Benchmark (All Models, matches CausalPFN's own methodology)
+# ============================================================================
+nb = nbf.v4.new_notebook()
+nb.cells = [
+    md(f"""# RealCause Lalonde Benchmark: Foundation Models vs. Metalearners
+
+{colab_badge('notebooks/RealCause_benchmark.ipynb')}
+
+**Replicates CausalPFN's own Lalonde evaluation methodology**, so results here are directly
+comparable to their paper's Table 1 (arXiv:2506.07918; repo: `github.com/vdblm/CausalPFN`).
+
+`Lalonde_benchmark.ipynb` scores models on the real NBER Lalonde data, which only has a true
+experimental **ATE** to check against — individual-level CATE ground truth is structurally
+impossible on real data (you only ever observe one of `y0`/`y1` per unit). CausalPFN's own
+paper doesn't score Lalonde on real data at all: it uses **RealCause** (Neal, Huang &
+Raghupathi 2020, arXiv:2011.15007), which fits a generative model to the real Lalonde
+covariates/treatment/outcome distribution, then *simulates* new potential outcomes `y0`/`y1`
+from it. The real covariates and treatment assignment are preserved, but because both
+potential outcomes are now simulated, every unit has a known individual treatment effect
+(`ite = y1 - y0`) — which is what makes PEHE computable at all here.
+
+This notebook runs:
+- 3 foundation models (CausalPFN, Do-PFN, CausalFM)
+- 6 metalearners (S-learner, T-learner, X-learner, Debiased ML, IPW, DR)
+
+on 10 RealCause realizations each of the PSID and CPS cohorts, and reports mean PEHE / mean ATE
+relative error ± SEM per model/cohort. Each model runs independently and failures don't block
+the rest — unavailable or erroring models are reported and skipped. See
+`docs/LALONDE_DATASET.md` for the full write-up of why this and `Lalonde_benchmark.ipynb`
+disagree and shouldn't be compared to each other directly."""),
+
+    *env_and_setup_cells(),
+
+    md("## 3. Model Registry"),
+
+    code("""from causal_bench import CausalPFNWrapper, DoPFNWrapper, CausalFMWrapper
+from causal_bench import (
+    SLearnerWrapper, TLearnerWrapper, XLearnerWrapper,
+    DebiasedMLWrapper, IPWWrapper, DRWrapper,
+)
+
+FOUNDATION_MODELS = {
+    "CausalPFN": CausalPFNWrapper,
+    "Do-PFN":    DoPFNWrapper,
+    "CausalFM":  CausalFMWrapper,
+}
+METALEARNERS = {
+    "S-learner":          SLearnerWrapper,
+    "T-learner":          TLearnerWrapper,
+    "X-learner":          XLearnerWrapper,
+    "Debiased ML":        DebiasedMLWrapper,
+    "IPW":                IPWWrapper,
+    "DR (Doubly Robust)": DRWrapper,
+}
+ALL_MODELS = {**METALEARNERS, **{f"{name} (Foundation)": cls for name, cls in FOUNDATION_MODELS.items()}}
+
+print("Foundation model availability:")
+for name, cls in FOUNDATION_MODELS.items():
+    print(f"  {'✓' if cls.is_available() else '✗'}  {name}")
+print(f"\\ndevice: {device}")"""),
+
+    md("""## 4. Load RealCause Lalonde Realizations
+
+**What "realizations" means**: RealCause fits one generative model per cohort (PSID or CPS) to
+the real covariates/treatment/outcome distribution. Each "realization" is one independent
+*sample* drawn from that fitted model — same real covariates and treatment assignment every
+time, but a different simulated draw of potential outcomes `y0`/`y1` (and therefore a different
+individual treatment effect `ite = y1 - y0`) each time. 100 such draws are pre-computed and
+checked into CausalPFN's own repo as flat CSVs; the paper uses "the first 10" and reports
+mean ± SEM across them — same reason IHDP ships 100 fixed realizations: it turns one noisy
+point estimate into a distribution, so a lucky/unlucky draw doesn't dominate the number.
+
+This downloads those same CSVs directly from `vdblm/CausalPFN` (cached locally after first run)
+and reproduces CausalPFN's own evaluation loop exactly (verified directly against
+`benchmarks/realcause.py` and `notebooks/causal_effect_full.ipynb` in their repo): per
+realization, fit each model on a 90% train split and score PEHE on the held-out 10% test split
+against the true `ite`; separately, fit a *fresh* instance of each model on the *full*
+realization data (matching their own separate CATE/ATE fits) and score ATE relative error
+against `ite.mean()` over all units. See `docs/LALONDE_DATASET.md` for the full writeup.
+
+**Reference numbers from the paper's Table 1** (CausalPFN only, for sanity-checking your own
+run against): Lalonde PSID — mean PEHE 13.98 ± 0.43, mean ATE relative error 0.20 ± 0.03.
+Lalonde CPS — mean PEHE 8.83 ± 0.04, mean ATE relative error 0.08 ± 0.02.
+
+**Heavier than a typical run**: CPS has ~16,000 rows per realization (PSID ~2,700), and the
+default runs 2 cohorts × 10 realizations × 2 fits (CATE + ATE) per model — expect this to take
+a while, especially for the foundation models. Best run on Colab with a GPU runtime. Lower
+`REALCAUSE_N_REALIZATIONS` (e.g. 1-2) for a quick smoke test before committing to a full run."""),
+
+    code("""from causal_bench import load_lalonde_realcause, evaluate_cate
+
+REALCAUSE_N_REALIZATIONS = 10  # matches the paper's "first 10 realizations"
+REALCAUSE_COHORTS = ["psid", "cps"]
+
+realcause_data = {}
+for cohort in REALCAUSE_COHORTS:
+    print(f"Loading RealCause Lalonde {cohort.upper()} ({REALCAUSE_N_REALIZATIONS} realizations)...")
+    reals = load_lalonde_realcause(cohort, n_realizations=REALCAUSE_N_REALIZATIONS)
+    realcause_data[cohort] = reals
+    print(f"  n_samples/realization={reals[0].meta['n_samples']}  "
+          f"(train={reals[0].meta['n_train']}, test={reals[0].meta['n_test']})")"""),
+
+    md("## 5. Run All Models on Every RealCause Realization"),
+
+    code("""def make_model(model_name, model_cls):
+    if model_name == "CausalFM":
+        checkpoint_path = "CausalFM-toolkit/checkpoints/checkpoints_standard/best_model.pth"
+        if not os.path.exists(checkpoint_path):
+            raise FileNotFoundError(f"Checkpoint not found: {checkpoint_path}")
+        return model_cls(checkpoint_path=checkpoint_path, device=device)
+    if model_name in FOUNDATION_MODELS:
+        return model_cls(device=device)
+    return model_cls()
+
+
+realcause_results = []
+print("=" * 70)
+print("REALCAUSE-BASED BENCHMARK")
+print("=" * 70)
+for display_name, model_cls in ALL_MODELS.items():
+    base_name = display_name.replace(" (Foundation)", "")
+    if not model_cls.is_available():
+        print(f"  {display_name:25s}: SKIPPED (not available in this environment)")
+        continue
+
+    for cohort in REALCAUSE_COHORTS:
+        n_ok, n_failed = 0, 0
+        for r in realcause_data[cohort]:
+            try:
+                t0 = time.time()
+                cate_model = make_model(base_name, model_cls)
+                cate_model.fit(r.X_train, r.T_train, r.Y_train)
+                tau_hat_test, _, _ = cate_model.predict(r.X_test)
+                cate_runtime = time.time() - t0
+
+                t0 = time.time()
+                ate_model = make_model(base_name, model_cls)
+                ate_model.fit(r.X_full, r.T_full, r.Y_full)
+                if hasattr(ate_model, "estimate_ate"):
+                    ate_hat = ate_model.estimate_ate(r.X_full, r.T_full, r.Y_full)
+                else:
+                    tau_hat_full, _, _ = ate_model.predict(r.X_full)
+                    ate_hat = float(np.mean(tau_hat_full))
+                ate_runtime = time.time() - t0
+
+                m = evaluate_cate(
+                    tau_hat_test, r.tau_true_test,
+                    ate_hat=ate_hat, ate_true=r.ate_true,
+                    runtime_s=cate_runtime + ate_runtime,
+                )
+                m.update(model=display_name, cohort=cohort, realization=r.realization)
+                realcause_results.append(m)
+                n_ok += 1
+            except Exception as e:
+                n_failed += 1
+                if n_failed == 1:
+                    print(f"  {display_name:25s} [{cohort}] realization {r.realization}: ERROR: {e}")
+        print(f"  {display_name:25s} [{cohort}]: {n_ok}/{len(realcause_data[cohort])} realizations OK"
+              + (f", {n_failed} failed" if n_failed else ""))
+print("\\n" + "=" * 70)"""),
+
+    md("## 6. RealCause Results Table"),
+
+    code("""realcause_df = pd.DataFrame(realcause_results)
+realcause_df.to_csv("lalonde_realcause_benchmark.csv", index=False)
+
+summary = (
+    realcause_df.groupby(["model", "cohort"])[["pehe", "ate_rel_error"]]
+    .agg(["mean", "sem"])
+)
+
+table_rows = []
+for (model_name, cohort), row in summary.iterrows():
+    table_rows.append({
+        "model": model_name,
+        "cohort": cohort,
+        "pehe": f"{row[('pehe', 'mean')]:.2f} \\u00b1 {row[('pehe', 'sem')]:.2f}",
+        "ate_rel_error": f"{row[('ate_rel_error', 'mean')]:.2f} \\u00b1 {row[('ate_rel_error', 'sem')]:.2f}",
+    })
+realcause_summary_df = pd.DataFrame(table_rows).sort_values(["cohort", "model"])
+
+print("RealCause-based Lalonde results (mean \\u00b1 SEM across "
+      f"{REALCAUSE_N_REALIZATIONS} realizations) -- compare directly to the paper's Table 1:")
+print(realcause_summary_df.to_string(index=False))
+print("\\nSaved per-realization rows to lalonde_realcause_benchmark.csv")"""),
+]
+
+save(nb, "RealCause_benchmark.ipynb")
 
 print("\nAll notebooks built successfully!")
 print(f"Generated: {os.path.join(OUT_DIR, 'Lalonde_benchmark.ipynb')}")
