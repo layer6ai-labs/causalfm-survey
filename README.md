@@ -25,6 +25,8 @@ Companion code for the survey on **causal foundation models** (prior-fitted netw
 
 ### 1. Install
 
+Ensure you have `python >=3.10,<3.13`.
+
 ```bash
 # With uv (recommended):
 uv sync
