@@ -15,8 +15,8 @@ REGRESSION_SPACE = {
     "max_features": ["sqrt", 0.5, 1.0],
 }
 PROPENSITY_SPACE = {
-    "C": np.logspace(-3, 3, 20),
-    "class_weight": [None, "balanced"],
+    "logistic__C": np.logspace(-3, 3, 20),
+    "logistic__class_weight": [None, "balanced"],
 }
 
 
@@ -87,8 +87,21 @@ class _BaseWrapper:
 
     def _propensity(self, X, T):
         from sklearn.linear_model import LogisticRegression
+        from sklearn.pipeline import Pipeline
+        from sklearn.preprocessing import StandardScaler
 
-        model = LogisticRegression(max_iter=2000, random_state=self.hpo_config.random_state)
+        model = Pipeline(
+            [
+                ("scaler", StandardScaler()),
+                (
+                    "logistic",
+                    LogisticRegression(
+                        max_iter=2000,
+                        random_state=self.hpo_config.random_state,
+                    ),
+                ),
+            ]
+        )
         if not self.hpo:
             model.fit(X, T)
             return model, None
