@@ -28,6 +28,7 @@ dependencies = [
 [project.optional-dependencies]
 metalearners = [
     "econml>=0.14.0",
+    "FLAML[automl]==2.3.5",
     "causalml>=0.14.0",
 ]
 # CausalFM (yccm/CausalFM-toolkit) is not on PyPI and must be cloned

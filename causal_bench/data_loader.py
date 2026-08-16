@@ -226,22 +226,24 @@ def list_available_datasets() -> list:
 # et al. 2020, arXiv:2011.15007), which fits a generative model to the real
 # Lalonde covariates/treatment/outcome distribution and then *simulates*
 # potential outcomes y0/y1 from it. Each independent sample from that fitted
-# model is a "realization" -- same real covariates and treatment assignment
-# every time, but a different simulated draw of y0/y1 (and therefore a
-# different individual treatment effect, `ite = y1 - y0`) each time. This
-# is what makes individual-level CATE ground truth possible at all here,
-# unlike on the real NBER data. See docs/LALONDE_DATASET.md for the full
-# comparison between the two Lalonde benchmarks in this repo.
+# model is a "realization". Each CSV is an independent draw of covariates,
+# treatment, and potential outcomes from that fitted generator; X and T are
+# therefore not fixed across realizations. Because both y0 and y1 are
+# available for every generated unit, each has a known individual treatment
+# effect (`ite = y1 - y0`). This makes individual-level CATE ground truth
+# possible here, unlike on the real NBER data. See docs/LALONDE_DATASET.md
+# for the full comparison between the two Lalonde benchmarks in this repo.
 #
 # CausalPFN's repo ships 100 pre-computed realizations each for the PSID
 # and CPS cohorts as flat CSVs (verified directly by downloading and
 # inspecting them): benchmarks/realcause_datasets/lalonde_{cohort}_sample{i}.csv,
 # columns `age,education,black,hispanic,married,nodegree,re74,re75,t,y,y0,y1,ite`
-# (i=0..99). The paper's Table 1 numbers are "the first 10 realizations" of
-# each, averaged (mean +/- SEM) -- this loader defaults to the same 10 for
-# direct comparability. Downloaded from CausalPFN's own repo rather than
-# re-run through RealCause's own generative-model-fitting pipeline, since
-# these are the literal artifacts the paper's reported numbers came from.
+# (i=0..99). CausalPFN arXiv v1 Table 1 used the first 10 realizations of
+# each, averaged (mean +/- SEM); the current arXiv v2 evaluation uses all
+# 100. This loader deliberately keeps a default of 10 for the requested v1
+# reproduction protocol. The files are downloaded from CausalPFN's repo
+# rather than regenerated, so the benchmark uses the exact published
+# artifacts.
 #
 # Train/test split and ATE ground truth replicate CausalPFN's own
 # `benchmarks/realcause.py::RealCauseDataset._get_data` exactly (verified
@@ -254,8 +256,9 @@ def list_available_datasets() -> list:
 # realization data for the ATE metric, rather than reusing the CATE model's
 # train-only fit.
 
+_REALCAUSE_REVISION = "7fae8e26e4e584c99723aaf719f3b9627b369de7"
 _REALCAUSE_BASE = (
-    "https://raw.githubusercontent.com/vdblm/CausalPFN/main/"
+    f"https://raw.githubusercontent.com/vdblm/CausalPFN/{_REALCAUSE_REVISION}/"
     "benchmarks/realcause_datasets/"
 )
 _REALCAUSE_FEATURE_COLS = ["age", "educ", "black", "hisp", "married", "nodegree", "re74", "re75"]
@@ -310,8 +313,9 @@ def load_lalonde_realcause(
     Lalonde `cohort` ("psid" or "cps"), replicating CausalPFN's own
     evaluation setup (see module docstring above / docs/LALONDE_DATASET.md).
 
-    Returns a list[RealCauseLalondeRealization] of length `n_realizations`
-    (the first N of the 100 available, matching the paper's "first 10").
+    Returns a list[RealCauseLalondeRealization] containing the first
+    `n_realizations` of the 100 available. The default 10 reproduces the
+    arXiv v1 first-10 protocol; the current arXiv v2 evaluation uses all 100.
     """
     if cohort not in ("psid", "cps"):
         raise ValueError(f"Unknown RealCause Lalonde cohort '{cohort}'. Choose from: ['psid', 'cps']")

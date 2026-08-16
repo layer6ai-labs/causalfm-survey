@@ -7,6 +7,7 @@ torch
 
 # Metalearners (S/T/X-learner, Debiased ML, IPW, DR)
 econml>=0.14.0
+FLAML[automl]==2.3.5
 
 # Bundled with econml for the metalearners feature set; not currently
 # imported by any code here directly (Lalonde loading downloads straight

@@ -75,13 +75,42 @@ class DoPFNWrapper(_StandardizedFoundationWrapper):
         repo_dir: path to the cloned Do-PFN repo root (checkpoint paths are
             relative to it, so this wrapper `chdir`s there for
             construction/fit/predict).
-        device: accepted for interface consistency with the other wrappers;
-            DoPFNRegressor takes no device argument of its own.
+        device: inference device. ``DoPFNRegressor`` exposes a zero-argument
+            constructor, but its inherited initialization path reads the
+            mutable ``device`` attribute when loading, caching, and moving the
+            checkpoint. The wrapper sets that attribute before ``fit`` below.
         """
         super().__init__()
         self.repo_dir = os.path.abspath(repo_dir)
-        self.device = device
+        self.device = str(device)
         self._model = None
+
+    def _reset_fit_state(self) -> None:
+        super()._reset_fit_state()
+        self._model = None
+
+    @classmethod
+    def clear_model_cache(cls) -> int:
+        """Clear Do-PFN's process-wide checkpoint cache.
+
+        Discard fitted wrapper references before calling this method; a live
+        wrapper still owns its model independently of the global cache.
+        Returns the number of cached checkpoint/device entries removed.
+        """
+        module = sys.modules.get("scripts.transformer_prediction_interface.base")
+        if module is None:
+            module = sys.modules.get("scripts.transformer_prediction_interface")
+        if module is None:
+            return 0
+
+        base_model = getattr(module, "TabPFNBaseModel", None)
+        cache = getattr(base_model, "models_in_memory", None)
+        if cache is None:
+            return 0
+
+        count = len(cache)
+        cache.clear()
+        return count
 
     @classmethod
     def is_available(cls, repo_dir: str = "Do-PFN") -> bool:
@@ -104,21 +133,35 @@ class DoPFNWrapper(_StandardizedFoundationWrapper):
         priors; converted back to the original outcome scale in `predict`
         by multiplying by Y's std (the mean cancels in a difference of
         group means)."""
-        _add_repo_to_path(self.repo_dir)
-        from scripts.transformer_prediction_interface import DoPFNRegressor
+        self._reset_fit_state()
+        try:
+            X_arr, T_arr, Y_arr = self._validate_fit_data(X, T, Y)
+            _add_repo_to_path(self.repo_dir)
+            from scripts.transformer_prediction_interface import DoPFNRegressor
 
-        T = np.asarray(T, dtype=np.float32).reshape(-1, 1)
-        X_s, Y_s = self._fit_scalers(X, Y)
-        X_full = np.concatenate([T, X_s], axis=1)
+            X_s, Y_s = self._fit_scalers(X_arr, Y_arr)
+            X_full = np.concatenate([T_arr.reshape(-1, 1), X_s], axis=1)
 
-        with _working_directory(self.repo_dir):
-            self._model = DoPFNRegressor()
-            self._model.show_progress = False
-            self._model.fit(X_full, Y_s)
+            with _working_directory(self.repo_dir):
+                model = DoPFNRegressor()
+                # The bundled DoPFN config does not specify a device, so the
+                # inherited TabPFNRegressor default is otherwise always ``cpu``.
+                # Set this before fit(): fit initializes the checkpoint and keys
+                # Do-PFN's immutable-weight cache by ``(model_string, device)``.
+                model.device = self.device
+                model.show_progress = False
+                model.fit(X_full, Y_s)
+        except Exception:
+            self._reset_fit_state()
+            raise
+
+        self._model = model
         return self
 
     def predict(self, X: np.ndarray) -> Prediction:
         """Return CATE predictions from Do-PFN's dedicated method."""
+        if self._model is None:
+            raise RuntimeError("fit() must be called before predict()")
         X_s = self._transform_x(X)
         # Column 0 is a placeholder -- predict_cate overwrites it internally.
         X_full = np.concatenate([np.zeros((len(X_s), 1), dtype=np.float32), X_s], axis=1)

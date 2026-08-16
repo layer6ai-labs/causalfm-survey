@@ -8,54 +8,116 @@ from dataclasses import dataclass
 import numpy as np
 
 
-REGRESSION_SPACE = {
-    "n_estimators": [100, 200, 500],
-    "max_depth": [None, 5, 10, 20],
-    "min_samples_leaf": [1, 5, 10, 20],
-    "max_features": ["sqrt", 0.5, 1.0],
-}
-PROPENSITY_SPACE = {
-    "logistic__C": np.logspace(-3, 3, 20),
-    "logistic__class_weight": [None, "balanced"],
-}
+REGRESSION_ESTIMATORS = (
+    "lgbm",
+    "xgboost",
+    "xgb_limitdepth",
+    "rf",
+    "kneighbor",
+    "extra_tree",
+)
+PROPENSITY_ESTIMATORS = REGRESSION_ESTIMATORS + ("lrl1", "lrl2")
 
 
 @dataclass(frozen=True)
 class HPOConfig:
-    n_iter: int = 20
+    """CausalPFN's FLAML configuration for EconML nuisance models.
+
+    ``time_budget`` is the budget for *each* AutoML nuisance-model search,
+    not for an entire causal estimator fit. This matches the reference
+    CausalPFN benchmark implementation.
+    """
+
+    time_budget: float = 900.0
     cv: int = 3
-    n_jobs: int = -1
-    random_state: int = 0
+    verbose: int = 0
+    early_stop: bool = True
 
 
 def _arrays(X, T, Y):
     X = np.asarray(X, dtype=np.float32)
-    T = np.asarray(T, dtype=np.float32).reshape(-1)
-    Y = np.asarray(Y, dtype=np.float32).reshape(-1)
+    T = np.asarray(T, dtype=np.float32)
+    Y = np.asarray(Y, dtype=np.float32)
+
+    if X.ndim != 2:
+        raise ValueError(f"X must be a 2D array; got shape {X.shape}")
+    if T.ndim > 2 or (T.ndim == 2 and T.shape[1] != 1):
+        raise ValueError(f"T must be one-dimensional; got shape {T.shape}")
+    if Y.ndim > 2 or (Y.ndim == 2 and Y.shape[1] != 1):
+        raise ValueError(f"Y must be one-dimensional; got shape {Y.shape}")
+
+    T = T.reshape(-1)
+    Y = Y.reshape(-1)
+    if not (len(X) == len(T) == len(Y)):
+        raise ValueError(
+            "X, T, and Y must have the same number of rows; "
+            f"got {len(X)}, {len(T)}, and {len(Y)}"
+        )
+    if len(X) == 0:
+        raise ValueError("X, T, and Y must not be empty")
+    if not (np.isfinite(X).all() and np.isfinite(T).all() and np.isfinite(Y).all()):
+        raise ValueError("X, T, and Y must contain only finite values")
+    treatments = np.unique(T)
+    if not np.array_equal(treatments, np.array([0.0, 1.0], dtype=np.float32)):
+        raise ValueError(
+            "These wrappers require both binary treatment arms encoded as 0 and 1; "
+            f"got {treatments.tolist()}"
+        )
     return X, T, Y
 
 
-def _tune(estimator, X, y, space, config, scoring, stratified=False):
-    from sklearn.model_selection import KFold, RandomizedSearchCV, StratifiedKFold
+def _tune_with_flaml(X, y, task, estimator_list, config):
+    """Run the same FLAML search used by CausalPFN's EconML baselines."""
+    try:
+        from flaml import AutoML
+    except ImportError as exc:
+        raise ImportError(
+            "hpo=True requires FLAML. Install it with "
+            "`uv pip install 'FLAML[automl]==2.3.5'` or "
+            "`pip install 'FLAML[automl]==2.3.5'`."
+        ) from exc
 
-    limit = np.unique(y, return_counts=True)[1].min() if stratified else len(y)
-    n_splits = min(config.cv, int(limit))
+    from sklearn.base import clone
+
+    if not np.isfinite(config.time_budget) or config.time_budget <= 0:
+        raise ValueError("HPO time_budget must be a positive number of seconds")
+    if not isinstance(config.cv, (int, np.integer)) or config.cv < 2:
+        raise ValueError("HPO cv must be an integer of at least 2")
+
+    y = np.asarray(y).reshape(-1)
+    split_limit = len(y)
+    if task == "classification":
+        classes, counts = np.unique(y, return_counts=True)
+        if len(classes) < 2:
+            raise ValueError("Classification HPO requires at least two classes")
+        split_limit = int(counts.min())
+    n_splits = min(config.cv, split_limit)
     if n_splits < 2:
-        raise ValueError("HPO requires at least two samples per CV split")
-    splitter = StratifiedKFold if stratified else KFold
-    cv = splitter(n_splits=n_splits, shuffle=True, random_state=config.random_state)
-    search = RandomizedSearchCV(
-        estimator,
-        space,
-        n_iter=config.n_iter,
-        scoring=scoring,
-        cv=cv,
-        n_jobs=config.n_jobs,
-        random_state=config.random_state,
-        refit=True,
+        raise ValueError("HPO requires at least two observations in every CV population")
+
+    automl = AutoML()
+    automl.fit(
+        X_train=X,
+        y_train=y,
+        time_budget=config.time_budget,
+        task=task,
+        eval_method="cv",
+        n_splits=n_splits,
+        verbose=config.verbose,
+        estimator_list=list(estimator_list),
+        early_stop=config.early_stop,
     )
-    search.fit(X, y)
-    return search.best_estimator_, search.best_params_
+    if automl.model is None or not hasattr(automl.model, "estimator"):
+        raise RuntimeError("FLAML completed without producing a cloneable best estimator")
+
+    params = {
+        "estimator": automl.best_estimator,
+        "config": dict(automl.best_config),
+        "n_splits": n_splits,
+    }
+    # CausalPFN clones FLAML's selected estimator so EconML performs the final
+    # fit itself instead of reusing the model fitted during the search.
+    return clone(automl.model.estimator), params
 
 
 class _BaseWrapper:
@@ -66,57 +128,98 @@ class _BaseWrapper:
         self.hpo_config = hpo_config or HPOConfig()
         self.best_params_ = {}
         self._learner = None
+        self._x_scaler = None
+        self._y_scaler = None
+
+    def _prepare_fit_data(self, X, T, Y, *, scale=True):
+        """Validate data and reproduce the reference benchmark preprocessing."""
+        self.best_params_.clear()
+        self._learner = None
+        self._x_scaler = None
+        self._y_scaler = None
+        self.__dict__.pop("ate_", None)
+        self.__dict__.pop("_propensity_model", None)
+        X, T, Y = _arrays(X, T, Y)
+
+        if not scale:
+            return X, T, Y
+
+        from sklearn.preprocessing import StandardScaler
+
+        self._x_scaler = StandardScaler().fit(X)
+        self._y_scaler = StandardScaler().fit(Y.reshape(-1, 1))
+        X = self._x_scaler.transform(X).astype(np.float32, copy=False)
+        Y = self._y_scaler.transform(Y.reshape(-1, 1)).reshape(-1).astype(
+            np.float32,
+            copy=False,
+        )
+        return X, T, Y
+
+    def _transform_x(self, X):
+        X = np.asarray(X, dtype=np.float32)
+        if X.ndim != 2:
+            raise ValueError(f"X must be a 2D array; got shape {X.shape}")
+        if not np.isfinite(X).all():
+            raise ValueError("X must contain only finite values")
+        if self._x_scaler is not None:
+            X = self._x_scaler.transform(X).astype(np.float32, copy=False)
+        return X
+
+    def _unscale_effect(self, effect):
+        effect = np.asarray(effect)
+        if self._y_scaler is not None:
+            effect = effect * self._y_scaler.scale_[0]
+        return effect
 
     def _regressor(self, X, y):
         from sklearn.base import clone
         from sklearn.ensemble import RandomForestRegressor
 
+        if self.hpo:
+            return _tune_with_flaml(
+                X,
+                y,
+                "regression",
+                REGRESSION_ESTIMATORS,
+                self.hpo_config,
+            )
         model = clone(self.model) if self.model is not None else RandomForestRegressor(
-            n_estimators=100, random_state=self.hpo_config.random_state
+            n_estimators=100,
+            random_state=0,
         )
-        if not self.hpo:
-            return model, None
-        return _tune(
-            model,
-            X,
-            y,
-            REGRESSION_SPACE,
-            self.hpo_config,
-            "neg_root_mean_squared_error",
-        )
+        return model, None
 
     def _propensity(self, X, T):
         from sklearn.linear_model import LogisticRegression
         from sklearn.pipeline import Pipeline
         from sklearn.preprocessing import StandardScaler
 
-        model = Pipeline(
-            [
-                ("scaler", StandardScaler()),
-                (
-                    "logistic",
-                    LogisticRegression(
-                        max_iter=2000,
-                        random_state=self.hpo_config.random_state,
+        if self.hpo:
+            return _tune_with_flaml(
+                X,
+                T,
+                "classification",
+                PROPENSITY_ESTIMATORS,
+                self.hpo_config,
+            )
+        return (
+            Pipeline(
+                [
+                    ("scaler", StandardScaler()),
+                    (
+                        "logistic",
+                        LogisticRegression(max_iter=2000, random_state=0),
                     ),
-                ),
-            ]
-        )
-        if not self.hpo:
-            model.fit(X, T)
-            return model, None
-        return _tune(
-            model,
-            X,
-            T,
-            PROPENSITY_SPACE,
-            self.hpo_config,
-            "neg_log_loss",
-            stratified=True,
+                ]
+            ),
+            None,
         )
 
     def predict(self, X):
-        tau = self._learner.effect(np.asarray(X, dtype=np.float32)).reshape(-1)
+        if self._learner is None:
+            raise RuntimeError("fit must be called before predict")
+        tau = self._learner.effect(self._transform_x(X)).reshape(-1)
+        tau = self._unscale_effect(tau).astype(np.float32, copy=False)
         return tau, None, None
 
     def run(self, X_train, T_train, Y_train, X_test):
@@ -140,7 +243,7 @@ class SLearnerWrapper(_BaseWrapper):
     def fit(self, X, T, Y):
         from econml.metalearners import SLearner
 
-        X, T, Y = _arrays(X, T, Y)
+        X, T, Y = self._prepare_fit_data(X, T, Y)
         model, params = self._regressor(np.column_stack([X, T]), Y)
         if params:
             self.best_params_["outcome"] = params
@@ -162,7 +265,7 @@ class TLearnerWrapper(_BaseWrapper):
     def fit(self, X, T, Y):
         from econml.metalearners import TLearner
 
-        X, T, Y = _arrays(X, T, Y)
+        X, T, Y = self._prepare_fit_data(X, T, Y)
         models = []
         for treatment in (0, 1):
             mask = T == treatment
@@ -188,7 +291,7 @@ class XLearnerWrapper(_BaseWrapper):
     def fit(self, X, T, Y):
         from econml.metalearners import XLearner
 
-        X, T, Y = _arrays(X, T, Y)
+        X, T, Y = self._prepare_fit_data(X, T, Y)
         models = []
         for treatment in (0, 1):
             mask = T == treatment
@@ -218,21 +321,25 @@ class DebiasedMLWrapper(_BaseWrapper):
         from econml.dml import DML
         from sklearn.linear_model import LinearRegression
 
-        X, T, Y = _arrays(X, T, Y)
+        X, T, Y = self._prepare_fit_data(X, T, Y)
         model_y, params_y = self._regressor(X, Y)
-        model_t, params_t = self._regressor(X, T)
+        model_t, params_t = self._propensity(X, T)
         if params_y:
-            self.best_params_.update(outcome=params_y, treatment=params_t)
+            self.best_params_["outcome"] = params_y
+        if params_t:
+            self.best_params_["treatment"] = params_t
         self._learner = DML(
             model_y=model_y,
             model_t=model_t,
-            model_final=LinearRegression(),
+            model_final=LinearRegression(fit_intercept=False),
+            discrete_treatment=True,
         ).fit(Y, T, X=X)
         return self
 
 
 class IPWWrapper(_BaseWrapper):
     name = "IPW"
+    supports_cate = False
 
     def __init__(self, device="cpu", hpo=False, hpo_config=None):
         super().__init__(device=device, hpo=hpo, hpo_config=hpo_config)
@@ -242,23 +349,25 @@ class IPWWrapper(_BaseWrapper):
         return True
 
     def fit(self, X, T, Y):
-        X, T, Y = _arrays(X, T, Y)
+        # The paper's IPW baseline is separate from EconMLBaseline and uses
+        # raw X and Y, while the EconML wrappers above are standardized.
+        X, T, Y = self._prepare_fit_data(X, T, Y, scale=False)
         self._propensity_model, params = self._propensity(X, T)
+        self._propensity_model.fit(X, T)
         if params:
             self.best_params_["propensity"] = params
-        for treatment in (0, 1):
-            mask = T == treatment
-            model, params = self._regressor(X[mask], Y[mask])
-            model.fit(X[mask], Y[mask])
-            setattr(self, f"_outcome_model_{treatment}", model)
-            if params:
-                self.best_params_[f"outcome_{treatment}"] = params
+        propensity = self._propensity_model.predict_proba(X)[:, 1].clip(1e-3, 1 - 1e-3)
+        treated = T == 1
+        treated_mean = np.average(Y[treated], weights=1.0 / propensity[treated])
+        control_mean = np.average(Y[~treated], weights=1.0 / (1.0 - propensity[~treated]))
+        self.ate_ = float(treated_mean - control_mean)
         return self
 
     def predict(self, X):
-        X = np.asarray(X, dtype=np.float32)
-        tau = self._outcome_model_1.predict(X) - self._outcome_model_0.predict(X)
-        return tau.reshape(-1), None, None
+        if not hasattr(self, "ate_"):
+            raise RuntimeError("fit must be called before predict")
+        n_rows = self._transform_x(X).shape[0]
+        return np.full(n_rows, self.ate_, dtype=np.float32), None, None
 
 
 class DRWrapper(_BaseWrapper):
@@ -269,29 +378,31 @@ class DRWrapper(_BaseWrapper):
 
     @classmethod
     def is_available(cls):
-        return True
+        try:
+            from econml.dr import ForestDRLearner  # noqa: F401
+            return True
+        except Exception:
+            return False
 
     def fit(self, X, T, Y):
-        X, T, Y = _arrays(X, T, Y)
-        self._propensity_model, params = self._propensity(X, T)
-        if params:
-            self.best_params_["propensity"] = params
-        propensity = self._propensity_model.predict_proba(X)[:, 1].clip(1e-3, 1 - 1e-3)
-        for treatment in (0, 1):
-            mask = T == treatment
-            model, params = self._regressor(X[mask], Y[mask])
-            probability = propensity if treatment else 1 - propensity
-            weights = (mask / probability).astype(np.float64)
-            model.fit(X, Y, sample_weight=weights)
-            setattr(self, f"_outcome_model_{treatment}", model)
-            if params:
-                self.best_params_[f"outcome_{treatment}"] = params
-        return self
+        from econml.dr import ForestDRLearner
+        from sklearn.preprocessing import PolynomialFeatures
 
-    def predict(self, X):
-        X = np.asarray(X, dtype=np.float32)
-        tau = self._outcome_model_1.predict(X) - self._outcome_model_0.predict(X)
-        return tau.reshape(-1), None, None
+        X, T, Y = self._prepare_fit_data(X, T, Y)
+        model_regression, params_regression = self._regressor(X, Y)
+        model_propensity, params_propensity = self._propensity(X, T)
+        if params_regression:
+            self.best_params_["outcome"] = params_regression
+        if params_propensity:
+            self.best_params_["propensity"] = params_propensity
+        self._learner = ForestDRLearner(
+            model_regression=model_regression,
+            model_propensity=model_propensity,
+            n_estimators=1000,
+            cv=5,
+            featurizer=PolynomialFeatures(degree=3),
+        ).fit(Y, T, X=X)
+        return self
 
 
 METALEARNER_WRAPPERS = {

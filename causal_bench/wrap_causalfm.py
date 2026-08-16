@@ -50,11 +50,53 @@ def _load_causalfm_model(checkpoint_path: str, device: str):
 class CausalFMWrapper(_StandardizedFoundationWrapper):
     name = "CausalFM"
 
-    def __init__(self, checkpoint_path: str, device: str = "cpu"):
+    def __init__(
+        self,
+        checkpoint_path: str,
+        device: str = "cpu",
+        query_batch_size: Optional[int] = None,
+    ):
+        """Configure CausalFM inference.
+
+        Query batching is mathematically invariant and can lower peak memory,
+        but the toolkit recomputes the complete training context for every
+        batch. ``None`` preserves native one-shot speed; use a positive value
+        such as 1024 only as an OOM fallback.
+        """
+        if query_batch_size is not None and (
+            isinstance(query_batch_size, (bool, np.bool_))
+            or not isinstance(query_batch_size, (int, np.integer))
+            or query_batch_size <= 0
+        ):
+            raise ValueError(
+                f"query_batch_size must be a positive integer or None, got {query_batch_size!r}"
+            )
         super().__init__()
         self.checkpoint_path = checkpoint_path
         self.device = device
+        self.query_batch_size = None if query_batch_size is None else int(query_batch_size)
         self._model = None
+        self._X_train = None
+        self._T_train = None
+        self._Y_train = None
+
+    def _reset_fit_state(self) -> None:
+        super()._reset_fit_state()
+        self._model = None
+        self._X_train = None
+        self._T_train = None
+        self._Y_train = None
+
+    @classmethod
+    def clear_model_cache(cls) -> int:
+        """Clear cached CausalFM checkpoints and return the entry count.
+
+        Discard fitted wrapper references before calling this method; a live
+        wrapper still owns its model independently of the global cache.
+        """
+        count = _load_causalfm_model.cache_info().currsize
+        _load_causalfm_model.cache_clear()
+        return count
 
     @classmethod
     def is_available(cls, checkpoint_path: Optional[str] = None) -> bool:
@@ -77,35 +119,81 @@ class CausalFMWrapper(_StandardizedFoundationWrapper):
         of that distribution; `predict` converts CATE back to the original
         outcome scale by multiplying by Y's std (the mean cancels in a
         difference of group means)."""
-        checkpoint_path = os.path.realpath(self.checkpoint_path)
-        self._model = _load_causalfm_model(checkpoint_path, self.device)
-        X_s, Y_s = self._fit_scalers(X, Y)
-        tensor_device = self._model.device
-        self._X_train = torch.as_tensor(X_s, dtype=torch.float32, device=tensor_device)
-        self._T_train = torch.as_tensor(T, dtype=torch.float32, device=tensor_device).reshape(-1, 1)
-        self._Y_train = torch.as_tensor(Y_s, dtype=torch.float32, device=tensor_device).reshape(
-            -1, 1
-        )
+        self._reset_fit_state()
+        try:
+            X_arr, T_arr, Y_arr = self._validate_fit_data(X, T, Y)
+            checkpoint_path = os.path.realpath(self.checkpoint_path)
+            model = _load_causalfm_model(checkpoint_path, self.device)
+            X_s, Y_s = self._fit_scalers(X_arr, Y_arr)
+            tensor_device = model.device
+            X_train = torch.as_tensor(X_s, dtype=torch.float32, device=tensor_device)
+            T_train = torch.as_tensor(T_arr, dtype=torch.float32, device=tensor_device).reshape(
+                -1, 1
+            )
+            Y_train = torch.as_tensor(Y_s, dtype=torch.float32, device=tensor_device).reshape(-1, 1)
+        except Exception:
+            self._reset_fit_state()
+            raise
+
+        self._model = model
+        self._X_train = X_train
+        self._T_train = T_train
+        self._Y_train = Y_train
         return self
 
     def predict(self, X: np.ndarray) -> Prediction:
+        if self._model is None:
+            raise RuntimeError("fit() must be called before predict()")
+
         # The toolkit's PerFeatureTransformerCATE expects torch.Tensor inputs,
         # with treatment/outcome shaped [N, 1] (not the 1-D arrays our common
         # wrapper interface uses) -- see `_pack_eval_io` in
         # src/tabpfn/model/causalFM.py.
-        X_test_t = torch.as_tensor(
-            self._transform_x(X), dtype=torch.float32, device=self._model.device
-        )
-        result = self._model.estimate_cate(self._X_train, self._T_train, self._Y_train, X_test_t)
+        # PerFeatureEncoderLayer restricts every query's item-attention keys and
+        # values to rows before single_eval_pos (the training context). Feature
+        # attention and MLPs are row-local, so query batching is invariant.
+        X_s = self._transform_x(X)
+        n_query = len(X_s)
+        if n_query == 0:
+            return np.empty(0, dtype=np.float32), None, None
+        X_test_t = torch.as_tensor(X_s, dtype=torch.float32, device=self._model.device)
 
-        tau_hat = self._unscale_effect(result["cate"].detach().cpu().numpy().reshape(-1))
+        batch_size = n_query if self.query_batch_size is None else self.query_batch_size
+        cate_chunks = []
+        lower_chunks = []
+        upper_chunks = []
+        interval_keys = None
+
+        for start in range(0, n_query, batch_size):
+            stop = min(start + batch_size, n_query)
+            result = self._model.estimate_cate(
+                self._X_train,
+                self._T_train,
+                self._Y_train,
+                X_test_t[start:stop],
+            )
+            cate_chunks.append(result["cate"].detach().cpu().numpy().reshape(-1))
+
+            batch_interval_keys = None
+            for lk, uk in (("cate_lower", "cate_upper"), ("ci_lower", "ci_upper")):
+                if lk in result and uk in result:
+                    batch_interval_keys = (lk, uk)
+                    break
+            if start == 0:
+                interval_keys = batch_interval_keys
+            elif batch_interval_keys != interval_keys:
+                raise RuntimeError(
+                    "CausalFM returned inconsistent interval keys across query batches"
+                )
+
+            if interval_keys is not None:
+                lk, uk = interval_keys
+                lower_chunks.append(result[lk].detach().cpu().numpy().reshape(-1))
+                upper_chunks.append(result[uk].detach().cpu().numpy().reshape(-1))
+
+        tau_hat = self._unscale_effect(np.concatenate(cate_chunks))
         lower = upper = None
-        # Optional calibrated uncertainty intervals, if the toolkit
-        # returns them (key names per docs: 'cate_lower'/'cate_upper'
-        # or 'ci_lower'/'ci_upper')
-        for lk, uk in (("cate_lower", "cate_upper"), ("ci_lower", "ci_upper")):
-            if lk in result and uk in result:
-                lower = self._unscale_effect(result[lk].detach().cpu().numpy().reshape(-1))
-                upper = self._unscale_effect(result[uk].detach().cpu().numpy().reshape(-1))
-                break
+        if interval_keys is not None:
+            lower = self._unscale_effect(np.concatenate(lower_chunks))
+            upper = self._unscale_effect(np.concatenate(upper_chunks))
         return tau_hat, lower, upper
