@@ -16,6 +16,7 @@ from .wrap_causalpfn import CausalPFNWrapper
 from .wrap_dopfn import DoPFNWrapper
 from .wrap_causalfm import CausalFMWrapper
 from .wrap_metalearners import (
+    HPOConfig,
     SLearnerWrapper,
     TLearnerWrapper,
     XLearnerWrapper,
@@ -44,6 +45,7 @@ __all__ = [
     "CausalPFNWrapper",
     "DoPFNWrapper",
     "CausalFMWrapper",
+    "HPOConfig",
     "SLearnerWrapper",
     "TLearnerWrapper",
     "XLearnerWrapper",
