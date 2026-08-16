@@ -27,22 +27,34 @@ checkpoint path must be supplied (see notebook setup); if unavailable,
 """
 
 from __future__ import annotations
-import time
+
+from functools import lru_cache
+import os
+
 import numpy as np
 import torch
-from sklearn.preprocessing import StandardScaler
-from typing import Optional, Tuple
+from typing import Optional
+
+from .wrap_foundation import Prediction, _StandardizedFoundationWrapper
 
 
-class CausalFMWrapper:
+# StandardCATEModel inference is eval/no-grad and does not retain a training
+# context by default, so sequential wrappers can share immutable weights.
+@lru_cache(maxsize=4)
+def _load_causalfm_model(checkpoint_path: str, device: str):
+    from causalfm.models import StandardCATEModel
+
+    return StandardCATEModel.from_pretrained(checkpoint_path, device=device)
+
+
+class CausalFMWrapper(_StandardizedFoundationWrapper):
     name = "CausalFM"
 
     def __init__(self, checkpoint_path: str, device: str = "cpu"):
+        super().__init__()
         self.checkpoint_path = checkpoint_path
         self.device = device
         self._model = None
-        self._x_scaler = None
-        self._y_scaler = None
 
     @classmethod
     def is_available(cls, checkpoint_path: Optional[str] = None) -> bool:
@@ -51,7 +63,6 @@ class CausalFMWrapper:
         except Exception:
             return False
         if checkpoint_path is not None:
-            import os
             return os.path.exists(checkpoint_path)
         return True
 
@@ -66,56 +77,35 @@ class CausalFMWrapper:
         of that distribution; `predict` converts CATE back to the original
         outcome scale by multiplying by Y's std (the mean cancels in a
         difference of group means)."""
-        from causalfm.models import StandardCATEModel
-
-        if self._model is None:
-            self._model = StandardCATEModel.from_pretrained(self.checkpoint_path)
-            if hasattr(self._model, "to"):
-                try:
-                    self._model = self._model.to(self.device)
-                except Exception:
-                    pass
-
-        X = np.asarray(X, dtype=np.float32)
-        Y = np.asarray(Y, dtype=np.float32)
-        self._x_scaler = StandardScaler().fit(X)
-        self._y_scaler = StandardScaler().fit(Y.reshape(-1, 1))
-
-        self._X_train = self._x_scaler.transform(X).astype(np.float32)
-        self._T_train = np.asarray(T, dtype=np.float32)
-        self._Y_train = self._y_scaler.transform(Y.reshape(-1, 1)).reshape(-1).astype(np.float32)
+        checkpoint_path = os.path.realpath(self.checkpoint_path)
+        self._model = _load_causalfm_model(checkpoint_path, self.device)
+        X_s, Y_s = self._fit_scalers(X, Y)
+        tensor_device = self._model.device
+        self._X_train = torch.as_tensor(X_s, dtype=torch.float32, device=tensor_device)
+        self._T_train = torch.as_tensor(T, dtype=torch.float32, device=tensor_device).reshape(-1, 1)
+        self._Y_train = torch.as_tensor(Y_s, dtype=torch.float32, device=tensor_device).reshape(
+            -1, 1
+        )
         return self
 
-    def predict(self, X: np.ndarray) -> Tuple[np.ndarray, Optional[np.ndarray], Optional[np.ndarray]]:
+    def predict(self, X: np.ndarray) -> Prediction:
         # The toolkit's PerFeatureTransformerCATE expects torch.Tensor inputs,
         # with treatment/outcome shaped [N, 1] (not the 1-D arrays our common
         # wrapper interface uses) -- see `_pack_eval_io` in
         # src/tabpfn/model/causalFM.py.
-        X_test_s = self._x_scaler.transform(np.asarray(X, dtype=np.float32))
+        X_test_t = torch.as_tensor(
+            self._transform_x(X), dtype=torch.float32, device=self._model.device
+        )
+        result = self._model.estimate_cate(self._X_train, self._T_train, self._Y_train, X_test_t)
 
-        X_train_t = torch.as_tensor(self._X_train, dtype=torch.float32)
-        T_train_t = torch.as_tensor(self._T_train, dtype=torch.float32).reshape(-1, 1)
-        Y_train_t = torch.as_tensor(self._Y_train, dtype=torch.float32).reshape(-1, 1)
-        X_test_t = torch.as_tensor(X_test_s.astype(np.float32))
-
-        result = self._model.estimate_cate(X_train_t, T_train_t, Y_train_t, X_test_t)
-
-        tau_hat = result["cate"].detach().cpu().numpy().reshape(-1) * self._y_scaler.scale_[0]
+        tau_hat = self._unscale_effect(result["cate"].detach().cpu().numpy().reshape(-1))
         lower = upper = None
         # Optional calibrated uncertainty intervals, if the toolkit
         # returns them (key names per docs: 'cate_lower'/'cate_upper'
         # or 'ci_lower'/'ci_upper')
         for lk, uk in (("cate_lower", "cate_upper"), ("ci_lower", "ci_upper")):
             if lk in result and uk in result:
-                lower = result[lk].detach().cpu().numpy().reshape(-1) * self._y_scaler.scale_[0]
-                upper = result[uk].detach().cpu().numpy().reshape(-1) * self._y_scaler.scale_[0]
+                lower = self._unscale_effect(result[lk].detach().cpu().numpy().reshape(-1))
+                upper = self._unscale_effect(result[uk].detach().cpu().numpy().reshape(-1))
                 break
         return tau_hat, lower, upper
-
-    def run(self, X_train, T_train, Y_train, X_test):
-        t0 = time.time()
-        self.fit(X_train, T_train, Y_train)
-        tau_hat, lower, upper = self.predict(X_test)
-        ate_hat = float(np.mean(tau_hat))
-        runtime = time.time() - t0
-        return tau_hat, lower, upper, ate_hat, runtime

@@ -26,10 +26,10 @@ drifted from the code):
     dopfn.fit(X_full_train, Y_train)          # X_full: treatment in COLUMN 0
     tau_hat = dopfn.predict_cate(X_full_test)  # torch.Tensor input required
 
-`DoPFNRegressor()` loads its checkpoint via a path relative to the Do-PFN
-repo root, lazily on both construction and `fit()` -- so this wrapper
-`chdir`s into `repo_dir` for those calls and restores the original cwd
-afterward (`finally`).
+`DoPFNRegressor()` reads its config via a path relative to the Do-PFN
+repository, and `fit()` initializes the checkpoint. Do-PFN itself caches the
+loaded model in `TabPFNBaseModel.models_in_memory`; this wrapper preserves
+that cache and only centralizes the required temporary `chdir`.
 
 Requires `torch<2.10`: Do-PFN's own `model/layer.py` imports `Optional` from
 `torch.nn.modules.transformer`, an unofficial re-export PyTorch removed in
@@ -39,15 +39,35 @@ can work around.
 """
 
 from __future__ import annotations
+
+from contextlib import contextmanager
 import os
-import time
+import sys
+
 import numpy as np
 import torch
-from sklearn.preprocessing import StandardScaler
-from typing import Optional, Tuple
+
+from .wrap_foundation import Prediction, _StandardizedFoundationWrapper
 
 
-class DoPFNWrapper:
+def _add_repo_to_path(repo_dir: str) -> str:
+    repo_dir = os.path.abspath(repo_dir)
+    if repo_dir not in sys.path:
+        sys.path.insert(0, repo_dir)
+    return repo_dir
+
+
+@contextmanager
+def _working_directory(path: str):
+    previous = os.getcwd()
+    os.chdir(path)
+    try:
+        yield
+    finally:
+        os.chdir(previous)
+
+
+class DoPFNWrapper(_StandardizedFoundationWrapper):
     name = "Do-PFN"
 
     def __init__(self, repo_dir: str = "Do-PFN", device: str = "cpu"):
@@ -58,20 +78,19 @@ class DoPFNWrapper:
         device: accepted for interface consistency with the other wrappers;
             DoPFNRegressor takes no device argument of its own.
         """
-        self.repo_dir = repo_dir
+        super().__init__()
+        self.repo_dir = os.path.abspath(repo_dir)
         self.device = device
         self._model = None
-        self._x_scaler = None
-        self._y_scaler = None
 
     @classmethod
     def is_available(cls, repo_dir: str = "Do-PFN") -> bool:
         if not os.path.isdir(repo_dir):
             return False
-        import sys
-        sys.path.insert(0, os.path.abspath(repo_dir))
+        _add_repo_to_path(repo_dir)
         try:
             from scripts.transformer_prediction_interface import DoPFNRegressor  # noqa: F401
+
             return True
         except Exception:
             return False
@@ -85,53 +104,25 @@ class DoPFNWrapper:
         priors; converted back to the original outcome scale in `predict`
         by multiplying by Y's std (the mean cancels in a difference of
         group means)."""
-        import sys
-        sys.path.insert(0, os.path.abspath(self.repo_dir))
+        _add_repo_to_path(self.repo_dir)
         from scripts.transformer_prediction_interface import DoPFNRegressor
 
-        X = np.asarray(X, dtype=np.float32)
         T = np.asarray(T, dtype=np.float32).reshape(-1, 1)
-        Y = np.asarray(Y, dtype=np.float32)
-
-        self._x_scaler = StandardScaler().fit(X)
-        self._y_scaler = StandardScaler().fit(Y.reshape(-1, 1))
-        X_s = self._x_scaler.transform(X).astype(np.float32)
-        Y_s = self._y_scaler.transform(Y.reshape(-1, 1)).reshape(-1).astype(np.float32)
+        X_s, Y_s = self._fit_scalers(X, Y)
         X_full = np.concatenate([T, X_s], axis=1)
 
-        _cwd = os.getcwd()
-        os.chdir(self.repo_dir)
-        try:
+        with _working_directory(self.repo_dir):
             self._model = DoPFNRegressor()
             self._model.show_progress = False
             self._model.fit(X_full, Y_s)
-        finally:
-            os.chdir(_cwd)
         return self
 
-    def predict(self, X: np.ndarray) -> Tuple[np.ndarray, Optional[np.ndarray], Optional[np.ndarray]]:
-        """Returns (tau_hat, lower_95, upper_95) via Do-PFN's own
-        `predict_cate`, which computes do(T=1) minus do(T=0) internally."""
-        X = np.asarray(X, dtype=np.float32)
-        X_s = self._x_scaler.transform(X).astype(np.float32)
+    def predict(self, X: np.ndarray) -> Prediction:
+        """Return CATE predictions from Do-PFN's dedicated method."""
+        X_s = self._transform_x(X)
         # Column 0 is a placeholder -- predict_cate overwrites it internally.
         X_full = np.concatenate([np.zeros((len(X_s), 1), dtype=np.float32), X_s], axis=1)
 
-        _cwd = os.getcwd()
-        os.chdir(self.repo_dir)
-        try:
-            tau_hat_s = np.asarray(
-                self._model.predict_cate(torch.as_tensor(X_full))
-            ).reshape(-1)
-        finally:
-            os.chdir(_cwd)
-        tau_hat = tau_hat_s * self._y_scaler.scale_[0]
-        return tau_hat, None, None
-
-    def run(self, X_train, T_train, Y_train, X_test):
-        t0 = time.time()
-        self.fit(X_train, T_train, Y_train)
-        tau_hat, lower, upper = self.predict(X_test)
-        ate_hat = float(np.mean(tau_hat))
-        runtime = time.time() - t0
-        return tau_hat, lower, upper, ate_hat, runtime
+        with _working_directory(self.repo_dir):
+            tau_hat_s = np.asarray(self._model.predict_cate(torch.as_tensor(X_full))).reshape(-1)
+        return self._unscale_effect(tau_hat_s), None, None
