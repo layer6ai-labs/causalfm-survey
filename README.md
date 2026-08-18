@@ -59,10 +59,6 @@ jupyter notebook notebooks/Foundation_models_sandbox.ipynb
 
 A playground/sandbox notebook. Runs three causal foundation models (CausalPFN, Do-PFN, CausalFM) side-by-side on one dataset, each called through its own native API. Includes basic evaluation and plotting code so that you can quickly experiment and learn about each CFM's properties.
 
-### Legacy notebook (pending removal)
-
-`notebooks/RealCause_benchmark.ipynb` (RealCause realizations, no HPO) still works, but is being superseded by the RealCause HPO benchmark above — see [`CLAUDE.md`](CLAUDE.md#notebook-consolidation-in-progress). Don't build new work on it. (`Lalonde_benchmark.ipynb`, the real-NBER-data notebook, has already been removed — real data can't supply CATE ground truth, which is what this survey measures; see [`docs/LALONDE_DATASET.md`](docs/LALONDE_DATASET.md).)
-
 ### Running notebooks locally
 
 Every notebook's Colab install cells (`%pip install ...`) silently no-op in this repo's local `uv`-managed venv (it has no `pip` module) — install what you need yourself first, with `uv pip install <pkg>` :
@@ -95,8 +91,7 @@ Hit something not covered here (a stale-import error after re-running a cell, a 
 ├── notebooks/
 │   ├── Foundation_models_quickstart.ipynb  # CausalPFN alone, end to end (hand-maintained)
 │   ├── RealCause_with_hpo_benchmark.ipynb  # THE Lalonde benchmark: 9 models, HPO, resumable
-│   ├── Foundation_models_sandbox.ipynb     # All 3 foundation models side by side (hand-maintained)
-│   └── RealCause_benchmark.ipynb           # Legacy, pending removal -- RealCause data, no HPO
+│   └── Foundation_models_sandbox.ipynb     # All 3 foundation models side by side (hand-maintained)
 ├── docs/
 │   ├── LALONDE_DATASET.md                  # Which Lalonde version this repo benchmarks on, and why
 │   └── WRAPPERS_GUIDE.md                   # causal_bench wrapper internals: HPO, standardization, gotchas
