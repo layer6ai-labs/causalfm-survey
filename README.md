@@ -1,6 +1,7 @@
 <div align="center">
 
 <a href="https://layer6.ai"><img src="assets/layer6.png" alt="Layer 6 AI" width="220"></a>
+
 [![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue)](pyproject.toml)
 [![License: MIT](https://img.shields.io/github/license/layer6ai-labs/causalfm-survey)](LICENSE)
 <!-- Add the arXiv badge once the paper has a real ID (see arXiv:2609.XXXXX in Citation below):
