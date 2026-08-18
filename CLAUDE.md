@@ -161,7 +161,7 @@ class *Wrapper:
 - **Not a quickstart** — per advisor feedback, a real quickstart should cover just CausalPFN end to end; that's `Foundation_models_quickstart.ipynb` above. This is a sandbox that runs all three foundation models side by side and is kept in git to preserve the exploratory observations and gotchas found along the way.
 - Does not import `causal_bench` — every foundation model call is that library's own native API, so a cell can be copy-pasted into another project as-is
 - Data is a small inline simulation (not `causal_bench.data_generators`), chosen for a business narrative rather than an abstract `X0, X1, ...` matrix
-- Has a "Reference output" section (real numbers + plot from a verified Colab GPU run, `SEED=42`, image at `notebooks/assets/reference_output_colab.png`) so practitioners can sanity-check their own run against a known-good one
+- Has a "Reference output" section (real numbers + plot from a verified Colab GPU run, `SEED=42`, image at `assets/reference_output_colab.png`) so practitioners can sanity-check their own run against a known-good one
 
 ## Key caveats & usage notes
 
