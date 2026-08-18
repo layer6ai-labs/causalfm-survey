@@ -197,3 +197,16 @@ class CausalFMWrapper(_StandardizedFoundationWrapper):
             lower = self._unscale_effect(np.concatenate(lower_chunks))
             upper = self._unscale_effect(np.concatenate(upper_chunks))
         return tau_hat, lower, upper
+
+    def estimate_ate(self, X: np.ndarray, T: np.ndarray, Y: np.ndarray) -> float:
+        """Estimate ATE using CausalFM's full-context effect distribution.
+
+        The upstream toolkit only exposes ``StandardCATEModel.estimate_cate``;
+        it does not ship a separate ATE model. This wrapper-level ATE API is
+        intended to be called after a fresh fit on the full realization, so it
+        is procedurally independent of held-out CATE evaluation.
+        """
+        tau_hat, _, _ = self.predict(X)
+        if tau_hat.size == 0:
+            raise ValueError("ATE estimation requires at least one row")
+        return float(np.mean(tau_hat))

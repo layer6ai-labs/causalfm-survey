@@ -169,3 +169,10 @@ class DoPFNWrapper(_StandardizedFoundationWrapper):
         with _working_directory(self.repo_dir):
             tau_hat_s = np.asarray(self._model.predict_cate(torch.as_tensor(X_full))).reshape(-1)
         return self._unscale_effect(tau_hat_s), None, None
+
+    def estimate_ate(self, X: np.ndarray, T: np.ndarray, Y: np.ndarray) -> float:
+        """Estimate ATE by averaging Do-PFN's dedicated CATE predictions."""
+        tau_hat, _, _ = self.predict(X)
+        if tau_hat.size == 0:
+            raise ValueError("ATE estimation requires at least one row")
+        return float(np.mean(tau_hat))

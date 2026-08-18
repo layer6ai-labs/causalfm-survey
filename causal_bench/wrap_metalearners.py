@@ -222,11 +222,22 @@ class _BaseWrapper:
         tau = self._unscale_effect(tau).astype(np.float32, copy=False)
         return tau, None, None
 
+    def estimate_ate(self, X, T, Y):
+        """Use EconML's population-level ATE API on the requested covariates."""
+        if self._learner is None:
+            raise RuntimeError("fit must be called before estimate_ate")
+        ate = self._learner.ate(X=self._transform_x(X), T0=0, T1=1)
+        ate = np.asarray(self._unscale_effect(ate), dtype=float).reshape(-1)
+        if ate.size != 1 or not np.isfinite(ate[0]):
+            raise RuntimeError(f"Expected one finite ATE value; got shape {ate.shape}")
+        return float(ate[0])
+
     def run(self, X_train, T_train, Y_train, X_test):
         start = time.time()
         self.fit(X_train, T_train, Y_train)
         tau, lower, upper = self.predict(X_test)
-        return tau, lower, upper, float(tau.mean()), time.time() - start
+        ate = self.estimate_ate(X_train, T_train, Y_train)
+        return tau, lower, upper, ate, time.time() - start
 
 
 class SLearnerWrapper(_BaseWrapper):
@@ -368,6 +379,11 @@ class IPWWrapper(_BaseWrapper):
             raise RuntimeError("fit must be called before predict")
         n_rows = self._transform_x(X).shape[0]
         return np.full(n_rows, self.ate_, dtype=np.float32), None, None
+
+    def estimate_ate(self, X, T, Y):
+        if not hasattr(self, "ate_"):
+            raise RuntimeError("fit must be called before estimate_ate")
+        return float(self.ate_)
 
 
 class DRWrapper(_BaseWrapper):

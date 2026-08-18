@@ -99,7 +99,7 @@ class _StandardizedFoundationWrapper:
         Y_train: np.ndarray,
         tau_hat: np.ndarray,
     ) -> float:
-        return float(np.mean(tau_hat))
+        return self.estimate_ate(X_train, T_train, Y_train)
 
     def run(self, X_train, T_train, Y_train, X_test):
         t0 = time.time()
