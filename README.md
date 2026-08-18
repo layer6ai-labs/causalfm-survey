@@ -2,6 +2,11 @@
 
 # Causal Foundation Models Survey
 
+[![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue)](pyproject.toml)
+[![License: MIT](https://img.shields.io/github/license/layer6ai-labs/causalfm-survey)](LICENSE)
+<!-- Add the arXiv badge once the paper has a real ID (see arXiv:2609.XXXXX in Citation below):
+[![arXiv](https://img.shields.io/badge/arXiv-2609.XXXXX-b31b1b.svg)](https://arxiv.org/abs/2609.XXXXX) -->
+
 Companion code for the survey on **causal foundation models** (prior-fitted networks that use in-context learning to estimate causal quantities on new datasets). In this repo, we compare three recent causal foundation models (CFMs) against six traditional metalearners on synthetic and real-world causal inference benchmarks.
 
 ## Models Included
