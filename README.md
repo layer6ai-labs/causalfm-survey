@@ -68,7 +68,7 @@ Every notebook's Colab install cells (`%pip install ...`) silently no-op in this
 - **CausalPFN**: `uv pip install causalpfn`
 - **Do-PFN**: `uv pip install networkx tqdm einops "torch<2.10"` — not on PyPI, notebooks `git clone` it automatically; `torch<2.10` is required (Do-PFN breaks on newer)
 - **CausalFM**: `uv pip install einops "tabpfn==2.0.9" tensorboard` — also not on PyPI, cloned automatically
-- **Metalearners**: `uv pip install econml causalml "FLAML[automl]==2.3.5"` — not `uv sync --extra metalearners`, which is broken on Python 3.10
+- **Metalearners**: `uv pip install econml causalml "FLAML[automl]==2.3.5"`.
 
 Apple Silicon Macs: CausalPFN segfaults on both CPU and MPS and is skipped automatically; Do-PFN and CausalFM both run fine on CPU, just slower than on a GPU.
 
