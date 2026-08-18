@@ -43,7 +43,15 @@ jupyter notebook notebooks/Foundation_models_quickstart.ipynb
 
 The fastest path to working with one causal foundation model. Simply install, load your data, split into context and query, then predict — done. No training required for each new inference dataset.
 
-### 3. Foundation Models Sandbox
+### 3. RealCause Lalonde HPO Benchmark
+
+```bash
+jupyter notebook notebooks/RealCause_with_hpo_benchmark.ipynb
+```
+
+The canonical Lalonde benchmark: all three foundation models against all six metalearners (FLAML-tuned via `hpo=True`) on RealCause semi-synthetic Lalonde realizations, replicating CausalPFN's own arXiv v1 methodology so results are directly comparable to their Table 1. A full run is expensive (~105 CPU-hours in production), so the notebook is built to survive being interrupted and resumed — see [`CLAUDE.md`](CLAUDE.md) for how.
+
+### 4. Foundation Models Sandbox
 
 ```bash
 jupyter notebook notebooks/Foundation_models_sandbox.ipynb
@@ -51,21 +59,9 @@ jupyter notebook notebooks/Foundation_models_sandbox.ipynb
 
 A playground/sandbox notebook. Runs three causal foundation models (CausalPFN, Do-PFN, CausalFM) side-by-side on one dataset, each called through its own native API. Includes basic evaluation and plotting code so that you can quickly experiment and learn about each CFM's properties.
 
-### 4. Lalonde Benchmark
+### Legacy notebook (pending removal)
 
-```bash
-jupyter notebook notebooks/Lalonde_benchmark.ipynb
-```
-
-Compare three causal foundation models against six causal metalearners on the real-world Lalonde benchmark, using this repo's `causal_bench` wrappers. Models are compared head-to-head on a lightweight but practical task.
-
-### 5. RealCause Benchmark
-
-```bash
-jupyter notebook notebooks/RealCause_benchmark.ipynb
-```
-
-Same 9 models as the Lalonde benchmark above, but run on RealCause semi-synthetic Lalonde realizations instead of the real NBER data — this gives individual-level CATE ground truth (impossible on real data) and matches CausalPFN's own paper methodology. See [`docs/LALONDE_DATASET.md`](docs/LALONDE_DATASET.md) for why the two Lalonde benchmarks report different numbers.
+`notebooks/RealCause_benchmark.ipynb` (RealCause realizations, no HPO) still works, but is being superseded by the RealCause HPO benchmark above — see [`CLAUDE.md`](CLAUDE.md#notebook-consolidation-in-progress). Don't build new work on it. (`Lalonde_benchmark.ipynb`, the real-NBER-data notebook, has already been removed — real data can't supply CATE ground truth, which is what this survey measures; see [`docs/LALONDE_DATASET.md`](docs/LALONDE_DATASET.md).)
 
 ### Running notebooks locally
 
@@ -74,11 +70,14 @@ Every notebook's Colab install cells (`%pip install ...`) silently no-op in this
 - **CausalPFN**: `uv pip install causalpfn`
 - **Do-PFN**: `uv pip install networkx tqdm einops "torch<2.10"` — not on PyPI, notebooks `git clone` it automatically; `torch<2.10` is required (Do-PFN breaks on newer)
 - **CausalFM**: `uv pip install einops "tabpfn==2.0.9" tensorboard` — also not on PyPI, cloned automatically
-- **Metalearners**: `uv pip install econml causalml` — not `uv sync --extra metalearners`, which is broken on Python 3.10
+- **Metalearners**: `uv pip install econml causalml "FLAML[automl]==2.3.5"` — not `uv sync --extra metalearners`, which is broken on Python 3.10
 
 Apple Silicon Macs: CausalPFN segfaults on both CPU and MPS and is skipped automatically; Do-PFN and CausalFM both run fine on CPU, just slower than on a GPU.
 
+`RealCause_with_hpo_benchmark.ipynb` additionally pins every dependency to an exact tested version (not just the two above) — its own §1 cell checks this and prints the exact `uv pip install` command to fix any mismatch, so there's nothing to look up separately.
+
 Hit something not covered here (a stale-import error after re-running a cell, a version-pin conflict, etc.)? See [`CLAUDE.md`](CLAUDE.md).
+
 ## Repository Structure
 
 ```
@@ -95,13 +94,12 @@ Hit something not covered here (a stale-import error after re-running a cell, a 
 │   └── wrap_metalearners.py                # S/T/X-learner, Debiased ML, IPW, DR wrappers
 ├── notebooks/
 │   ├── Foundation_models_quickstart.ipynb  # CausalPFN alone, end to end (hand-maintained)
+│   ├── RealCause_with_hpo_benchmark.ipynb  # THE Lalonde benchmark: 9 models, HPO, resumable
 │   ├── Foundation_models_sandbox.ipynb     # All 3 foundation models side by side (hand-maintained)
-│   ├── Lalonde_benchmark.ipynb             # Foundation models vs. metalearners, real NBER data
-│   └── RealCause_benchmark.ipynb           # Same 9 models, RealCause semi-synthetic realizations
-├── scripts/
-│   └── build_new_notebooks.py              # Regenerates Lalonde_benchmark.ipynb + RealCause_benchmark.ipynb
+│   └── RealCause_benchmark.ipynb           # Legacy, pending removal -- RealCause data, no HPO
 ├── docs/
-│   └── LALONDE_DATASET.md                  # Why the two Lalonde benchmarks report different numbers
+│   ├── LALONDE_DATASET.md                  # Which Lalonde version this repo benchmarks on, and why
+│   └── WRAPPERS_GUIDE.md                   # causal_bench wrapper internals: HPO, standardization, gotchas
 ├── requirements.txt                        # Dependencies (numpy, pandas, torch, econml, causalml, etc.)
 ├── pyproject.toml                          # uv configuration
 ├── CLAUDE.md                               # Development guide
@@ -149,7 +147,7 @@ ate_hat = float(np.asarray(ate_estimator.estimate_ate()).reshape(-1)[0])
 
 See [`Foundation_models_sandbox.ipynb`](notebooks/Foundation_models_sandbox.ipynb) which runs CausalPFN, Do-PFN, and CausalFM side by side on the same dataset, then plots predicted-vs-true CATE and a PEHE bar chart for them.
 
-> **Be aware**: all three models are pretrained on standardized (mean 0, unit variance) synthetic data, so standardizing your own inputs before comparing them can noticeably change your results. The sandbox's simulated dataset is already roughly standardized by construction — if you swap in your own data here, scale it first. (This repo's `causal_bench` wrappers, used in `Lalonde_benchmark.ipynb`/`RealCause_benchmark.ipynb`, do this standardization for you automatically; calling each model's native API directly like this notebook does does not.)
+> **Be aware**: all three models are pretrained on standardized (mean 0, unit variance) synthetic data, so standardizing your own inputs before comparing them can noticeably change your results. The sandbox's simulated dataset is already roughly standardized by construction — if you swap in your own data here, scale it first. (This repo's `causal_bench` wrappers, used in `RealCause_with_hpo_benchmark.ipynb`, do this standardization for you automatically; calling each model's native API directly like this notebook does does not.)
 
 ## On Google Colab
 
