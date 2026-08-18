@@ -59,6 +59,26 @@ jupyter notebook notebooks/Lalonde_benchmark.ipynb
 
 Compare three causal foundation models against six causal metalearners on the real-world Lalonde benchmark, using this repo's `causal_bench` wrappers. Models are compared head-to-head on a lightweight but practical task.
 
+### 5. RealCause Benchmark
+
+```bash
+jupyter notebook notebooks/RealCause_benchmark.ipynb
+```
+
+Same 9 models as the Lalonde benchmark above, but run on RealCause semi-synthetic Lalonde realizations instead of the real NBER data — this gives individual-level CATE ground truth (impossible on real data) and matches CausalPFN's own paper methodology. See [`docs/LALONDE_DATASET.md`](docs/LALONDE_DATASET.md) for why the two Lalonde benchmarks report different numbers.
+
+### Running notebooks locally
+
+Every notebook's Colab install cells (`%pip install ...`) silently no-op in this repo's local `uv`-managed venv (it has no `pip` module) — install what you need yourself first, with `uv pip install <pkg>` :
+
+- **CausalPFN**: `uv pip install causalpfn`
+- **Do-PFN**: `uv pip install networkx tqdm einops "torch<2.10"` — not on PyPI, notebooks `git clone` it automatically; `torch<2.10` is required (Do-PFN breaks on newer)
+- **CausalFM**: `uv pip install einops "tabpfn==2.0.9" tensorboard` — also not on PyPI, cloned automatically
+- **Metalearners**: `uv pip install econml causalml` — not `uv sync --extra metalearners`, which is broken on Python 3.10
+
+Apple Silicon Macs: CausalPFN segfaults on both CPU and MPS and is skipped automatically; Do-PFN and CausalFM both run fine on CPU, just slower than on a GPU.
+
+Hit something not covered here (a stale-import error after re-running a cell, a version-pin conflict, etc.)? See [`CLAUDE.md`](CLAUDE.md).
 ## Repository Structure
 
 ```
@@ -66,18 +86,22 @@ Compare three causal foundation models against six causal metalearners on the re
 ├── causal_bench/                           # Shared evaluation library
 │   ├── __init__.py
 │   ├── data_generators.py                  # 4 synthetic datasets (linear, nonlinear, IV, frontdoor)
-│   ├── data_loader.py                      # Load Lalonde real-world benchmark
+│   ├── data_loader.py                      # Load Lalonde: real NBER data + RealCause semi-synthetic
 │   ├── metrics.py                          # PEHE, ATE error, bias, coverage, etc.
 │   ├── wrap_causalfm.py                    # CausalFM wrapper
 │   ├── wrap_causalpfn.py                   # CausalPFN wrapper
 │   ├── wrap_dopfn.py                       # Do-PFN wrapper
+│   ├── wrap_foundation.py                  # Shared logic used by the 3 foundation-model wrappers
 │   └── wrap_metalearners.py                # S/T/X-learner, Debiased ML, IPW, DR wrappers
 ├── notebooks/
 │   ├── Foundation_models_quickstart.ipynb  # CausalPFN alone, end to end (hand-maintained)
 │   ├── Foundation_models_sandbox.ipynb     # All 3 foundation models side by side (hand-maintained)
-│   └── Lalonde_benchmark.ipynb             # Foundation model vs. metalearners, via causal_bench
+│   ├── Lalonde_benchmark.ipynb             # Foundation models vs. metalearners, real NBER data
+│   └── RealCause_benchmark.ipynb           # Same 9 models, RealCause semi-synthetic realizations
 ├── scripts/
-│   └── build_new_notebooks.py              # Regenerates Lalonde_benchmark.ipynb
+│   └── build_new_notebooks.py              # Regenerates Lalonde_benchmark.ipynb + RealCause_benchmark.ipynb
+├── docs/
+│   └── LALONDE_DATASET.md                  # Why the two Lalonde benchmarks report different numbers
 ├── requirements.txt                        # Dependencies (numpy, pandas, torch, econml, causalml, etc.)
 ├── pyproject.toml                          # uv configuration
 ├── CLAUDE.md                               # Development guide
@@ -86,20 +110,12 @@ Compare three causal foundation models against six causal metalearners on the re
 
 ## Datasets
 
-### Synthetic (from `causal_bench.data_generators`)
-
-| Name | Identification | CATE | Notes |
-|---|---|---|---|
-| `linear_confounded` | Backdoor | Homogeneous (constant) | Textbook setting: linear responses, observed confounders |
-| `nonlinear_heterogeneous` | Backdoor | Heterogeneous `τ(x)=sin(x₀)+0.5x₁` | Matches CausalPFN's README example; tests nonlinearity |
-| `iv_binary` | Instrumental Variable | Homogeneous | Hidden confounder + binary instrument; tests IV robustness |
-| `frontdoor` | Front-Door Adjustment | Homogeneous | Hidden confounder + mediator; tests mediation |
-
 ### Real-World
 
 | Name | Source | Notes |
 |---|---|---|
-| `lalonde_nsw_psid` | NSW vs. PSID | Standard causal ML benchmark; no ground truth CATE |
+| Lalonde (`load_lalonde`) | Real NSW vs. PSID data | No ground-truth CATE, but a true experimental ATE is available (`ds.ate`) |
+| RealCause Lalonde (`load_lalonde_realcause`) | PSID + CPS, 10 realizations each | Semi-synthetic realizations over real covariates — gives individual-level CATE ground truth; matches CausalPFN's paper methodology |
 
 ## Metrics
 
@@ -115,50 +131,25 @@ All models evaluated on:
 
 ### Run one model on one dataset (Python)
 
+See [`Foundation_models_quickstart.ipynb`](notebooks/Foundation_models_quickstart.ipynb) for the full runnable notebook (data generation, install, reference output). The core call, straight from that notebook:
+
 ```python
-from causal_bench import get_dataset, CausalPFNWrapper, evaluate_cate
-import numpy as np
+from causalpfn import CATEEstimator, ATEEstimator
 
-# Load synthetic dataset
-ds = get_dataset("nonlinear_heterogeneous", n=2000, seed=0)
-train_idx, test_idx = ds.train_test_split(0.7, seed=0)
+cate_estimator = CATEEstimator(device=device, verbose=False)
+cate_estimator.fit(X_ctx, T_ctx, Y_ctx)
+cate_hat = np.asarray(cate_estimator.estimate_cate(X_qry)).reshape(-1)
 
-# Create and fit model (use "mps" on Apple Silicon, "cuda" on GPU, "cpu" otherwise)
-model = CausalPFNWrapper(device="cpu")
-model.fit(ds.X[train_idx], ds.T[train_idx], ds.Y[train_idx])
-
-# Predict and evaluate
-tau_hat, lower, upper = model.predict(ds.X[test_idx])
-results = evaluate_cate(tau_hat, ds.tau[test_idx], lower=lower, upper=upper)
-print(f"PEHE: {results['pehe']:.4f}")
+ate_estimator = ATEEstimator(device=device, verbose=False)
+ate_estimator.fit(X_ctx, T_ctx, Y_ctx)
+ate_hat = float(np.asarray(ate_estimator.estimate_ate()).reshape(-1)[0])
 ```
 
 ### Compare models programmatically
 
-```python
-from causal_bench import (
-    get_dataset, evaluate_cate,
-    CausalPFNWrapper, SLearnerWrapper, TLearnerWrapper
-)
+See [`Foundation_models_sandbox.ipynb`](notebooks/Foundation_models_sandbox.ipynb) which runs CausalPFN, Do-PFN, and CausalFM side by side on the same dataset, then plots predicted-vs-true CATE and a PEHE bar chart for them.
 
-ds = get_dataset("nonlinear_heterogeneous", n=2000, seed=0)
-train_idx, test_idx = ds.train_test_split(0.7, seed=0)
-
-models = [
-    CausalPFNWrapper(),
-    SLearnerWrapper(),
-    TLearnerWrapper(),
-]
-
-for model_cls in models:
-    tau_hat, lower, upper, ate_hat, runtime = model_cls().run(
-        ds.X[train_idx], ds.T[train_idx], ds.Y[train_idx],
-        ds.X[test_idx]
-    )
-    result = evaluate_cate(tau_hat, ds.tau[test_idx], ate_hat=ate_hat,
-                          ate_true=ds.ate, lower=lower, upper=upper, runtime_s=runtime)
-    print(f"{model_cls.name}: PEHE={result['pehe']:.4f}, runtime={runtime:.2f}s")
-```
+> **Be aware**: all three models are pretrained on standardized (mean 0, unit variance) synthetic data, so standardizing your own inputs before comparing them can noticeably change your results. The sandbox's simulated dataset is already roughly standardized by construction — if you swap in your own data here, scale it first. (This repo's `causal_bench` wrappers, used in `Lalonde_benchmark.ipynb`/`RealCause_benchmark.ipynb`, do this standardization for you automatically; calling each model's native API directly like this notebook does does not.)
 
 ## On Google Colab
 
@@ -170,16 +161,6 @@ Each notebook includes an "Open in Colab" badge. Click it to run directly on Col
 4. Run all cells top-to-bottom
 
 **Note**: Foundation models that require checkpoints (CausalFM) or external repos (Do-PFN) are installed on first use in the notebook.
-
-## Important Notes
-
-- **Synthetic datasets**: Ground-truth CATE available; full metrics (PEHE, bias, coverage) computed.
-- **Lalonde**: Real-world data; no ground-truth CATE, but `ds.ate` is a true experimental ATE (~$1,794) from a separate randomized comparison, not a naive diff-in-means on the (confounded) data models are actually scored on — see `ds.ate_naive_observed` for that naive number. `Lalonde_benchmark.ipynb` uses `variant="nsw_psid_trimmed"` (common-support trimmed) by default rather than the raw pairing, which has too little covariate overlap for any method to get the sign of the effect right. See [`docs/LALONDE_DATASET.md`](docs/LALONDE_DATASET.md) for the full explanation.
-- **Foundation models**: Fast (no per-dataset training). Do not re-train; just condition on data.
-- **Metalearners**: Traditional ML methods trained from scratch on each dataset.
-- **Missing dependencies**: Notebooks gracefully skip unavailable models (with warnings) rather than crashing.
-- **CausalFM setup**: `CausalFM-toolkit` isn't on PyPI — the notebook clones it and adds it to `sys.path` automatically, but it also needs `einops`, `tabpfn==2.0.9`, and `tensorboard` (its own `requirements.txt` is a frozen dev snapshot with Linux/CUDA-only pins and shouldn't be installed directly). On Colab the notebook's `%pip install` cell handles this for you. Locally: `uv pip install einops "tabpfn==2.0.9" tensorboard` (see next note — don't use `uv sync --extra causalfm`).
-- **Local venv (`uv`) has no `pip`**: notebook cells using `%pip install ...` only work on Colab (which ships `pip`). Locally, install missing packages with `uv pip install <pkg>` instead. Avoid `uv sync --extra <name>` for the `metalearners`/`causalfm` extras specifically — on Python 3.10 it resolves an incompatible `llvmlite` for `metalearners` and, for either extra, reconciles the whole env to just what's declared, uninstalling anything from extras you didn't also pass.
 
 ## Citation
 
