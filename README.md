@@ -1,4 +1,6 @@
-# Causal Foundation Models — Benchmark Suite
+<a href="https://layer6.ai"><img src="assets/layer6.png" alt="Layer 6 AI" width="220"></a>
+
+# Causal Foundation Models Survey
 
 Companion code for the survey on **causal foundation models** (prior-fitted networks that use in-context learning to estimate causal quantities on new datasets). In this repo, we compare three recent causal foundation models (CFMs) against six traditional metalearners on synthetic and real-world causal inference benchmarks.
 
@@ -43,21 +45,21 @@ jupyter notebook notebooks/Foundation_models_quickstart.ipynb
 
 The fastest path to working with one causal foundation model. Simply install, load your data, split into context and query, then predict — done. No training required for each new inference dataset.
 
-### 3. RealCause Lalonde HPO Benchmark
-
-```bash
-jupyter notebook notebooks/RealCause_with_hpo_benchmark.ipynb
-```
-
-The canonical Lalonde benchmark: all three foundation models against all six metalearners (FLAML-tuned via `hpo=True`) on RealCause semi-synthetic Lalonde realizations, replicating CausalPFN's own arXiv v1 methodology so results are directly comparable to their Table 1. A full run is expensive (~105 CPU-hours in production), so the notebook is built to survive being interrupted and resumed — see [`CLAUDE.md`](CLAUDE.md) for how.
-
-### 4. Foundation Models Sandbox
+### 3. Foundation Models Sandbox
 
 ```bash
 jupyter notebook notebooks/Foundation_models_sandbox.ipynb
 ```
 
 A playground/sandbox notebook. Runs three causal foundation models (CausalPFN, Do-PFN, CausalFM) side-by-side on one dataset, each called through its own native API. Includes basic evaluation and plotting code so that you can quickly experiment and learn about each CFM's properties.
+
+### 4. RealCause Lalonde HPO Benchmark
+
+```bash
+jupyter notebook notebooks/RealCause_with_hpo_benchmark.ipynb
+```
+
+The Lalonde benchmark: all three foundation models against all six metalearners (HPO-tuned), benchmarked on the RealCause semi-synthetic Lalonde dataset — see [`docs/LALONDE_DATASET.md`](docs/LALONDE_DATASET.md) for what that dataset is and why we use it.
 
 ### Running notebooks locally
 
@@ -90,8 +92,8 @@ Hit something not covered here (a stale-import error after re-running a cell, a 
 │   └── wrap_metalearners.py                # S/T/X-learner, Debiased ML, IPW, DR wrappers
 ├── notebooks/
 │   ├── Foundation_models_quickstart.ipynb  # CausalPFN alone, end to end (hand-maintained)
-│   ├── RealCause_with_hpo_benchmark.ipynb  # THE Lalonde benchmark: 9 models, HPO, resumable
-│   └── Foundation_models_sandbox.ipynb     # All 3 foundation models side by side (hand-maintained)
+│   ├── Foundation_models_sandbox.ipynb     # All 3 foundation models side by side (hand-maintained)
+│   └── RealCause_with_hpo_benchmark.ipynb  # The Lalonde benchmark: 9 models, HPO-tuned, RealCause data
 ├── docs/
 │   ├── LALONDE_DATASET.md                  # Which Lalonde version this repo benchmarks on, and why
 │   └── WRAPPERS_GUIDE.md                   # causal_bench wrapper internals: HPO, standardization, gotchas
