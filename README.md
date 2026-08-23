@@ -167,8 +167,6 @@ ate_hat = float(np.asarray(ate_estimator.estimate_ate()).reshape(-1)[0])
 
 See [`Foundation_models_sandbox.ipynb`](notebooks/Foundation_models_sandbox.ipynb) which runs CausalPFN, Do-PFN, and CausalFM side by side on the same dataset, then plots predicted-vs-true CATE and a PEHE bar chart for them.
 
-> **Be aware**: all three models are pretrained on standardized (mean 0, unit variance) synthetic data, so standardizing your own inputs before comparing them can noticeably change your results. The sandbox's simulated dataset is already roughly standardized by construction — if you swap in your own data here, scale it first. (This repo's `causal_bench` wrappers, used in `scripts/run_benchmark.py`, do this standardization for you automatically; calling each model's native API directly like this notebook does does not.)
-
 ## On Google Colab
 
 Each notebook includes an "Open in Colab" badge. Click it to run directly on Colab (all installs happen automatically). Alternatively:
