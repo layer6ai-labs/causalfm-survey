@@ -65,10 +65,11 @@ A playground/sandbox notebook. Runs three causal foundation models (CausalPFN, D
 ### 4. RealCause Lalonde HPO Benchmark
 
 ```bash
-jupyter notebook notebooks/RealCause_with_hpo_benchmark.ipynb
+python scripts/run_benchmark.py --smoke   # fast end-to-end check (no HPO, 1 realization/cohort)
+python scripts/run_benchmark.py           # full run: 9 models x 2 cohorts x 10 realizations, HPO-tuned
 ```
 
-The Lalonde benchmark: all three foundation models against all six metalearners (HPO-tuned), benchmarked on the RealCause semi-synthetic Lalonde dataset — see [`docs/LALONDE_DATASET.md`](docs/LALONDE_DATASET.md) for what that dataset is and why we use it.
+The Lalonde benchmark: all three foundation models against all six metalearners (HPO-tuned), benchmarked on the RealCause semi-synthetic Lalonde dataset — see [`docs/LALONDE_DATASET.md`](docs/LALONDE_DATASET.md) for what that dataset is and why we use it. A full run is expensive (~105 CPU-hours of FLAML search); results are checkpointed to CSV after every task so an interrupted run doesn't lose progress, and progress is logged to both stdout and `logs/run_benchmark_<timestamp>.log`. Run `python scripts/run_benchmark.py --help` for all options (`--gpu`, `--n-realizations`, `--hpo-time-budget`, `--results-dir`).
 
 ### Running notebooks locally
 
@@ -81,7 +82,7 @@ Every notebook's Colab install cells (`%pip install ...`) silently no-op in this
 
 Apple Silicon Macs: CausalPFN segfaults on both CPU and MPS and is skipped automatically; Do-PFN and CausalFM both run fine on CPU, just slower than on a GPU.
 
-`RealCause_with_hpo_benchmark.ipynb` additionally pins every dependency to an exact tested version (not just the two above) — its own §1 cell checks this and prints the exact `uv pip install` command to fix any mismatch, so there's nothing to look up separately.
+`scripts/run_benchmark.py` needs all four dependency groups above installed at once (it runs all 9 models), plus `git clone`s of Do-PFN and CausalFM-toolkit under `notebooks/` (same layout the sandbox notebook uses).
 
 Hit something not covered here (a stale-import error after re-running a cell, a version-pin conflict, etc.)? See [`CLAUDE.md`](CLAUDE.md).
 
@@ -101,8 +102,9 @@ Hit something not covered here (a stale-import error after re-running a cell, a 
 │   └── wrap_metalearners.py                # S/T/X-learner, Debiased ML, IPW, DR wrappers
 ├── notebooks/
 │   ├── Foundation_models_quickstart.ipynb  # CausalPFN alone, end to end (hand-maintained)
-│   ├── Foundation_models_sandbox.ipynb     # All 3 foundation models side by side (hand-maintained)
-│   └── RealCause_with_hpo_benchmark.ipynb  # The Lalonde benchmark: 9 models, HPO-tuned, RealCause data
+│   └── Foundation_models_sandbox.ipynb     # All 3 foundation models side by side (hand-maintained)
+├── scripts/
+│   └── run_benchmark.py                    # The Lalonde benchmark: 9 models, HPO-tuned, RealCause data
 ├── docs/
 │   ├── LALONDE_DATASET.md                  # Which Lalonde version this repo benchmarks on, and why
 │   └── WRAPPERS_GUIDE.md                   # causal_bench wrapper internals: HPO, standardization, gotchas
@@ -153,7 +155,7 @@ ate_hat = float(np.asarray(ate_estimator.estimate_ate()).reshape(-1)[0])
 
 See [`Foundation_models_sandbox.ipynb`](notebooks/Foundation_models_sandbox.ipynb) which runs CausalPFN, Do-PFN, and CausalFM side by side on the same dataset, then plots predicted-vs-true CATE and a PEHE bar chart for them.
 
-> **Be aware**: all three models are pretrained on standardized (mean 0, unit variance) synthetic data, so standardizing your own inputs before comparing them can noticeably change your results. The sandbox's simulated dataset is already roughly standardized by construction — if you swap in your own data here, scale it first. (This repo's `causal_bench` wrappers, used in `RealCause_with_hpo_benchmark.ipynb`, do this standardization for you automatically; calling each model's native API directly like this notebook does does not.)
+> **Be aware**: all three models are pretrained on standardized (mean 0, unit variance) synthetic data, so standardizing your own inputs before comparing them can noticeably change your results. The sandbox's simulated dataset is already roughly standardized by construction — if you swap in your own data here, scale it first. (This repo's `causal_bench` wrappers, used in `scripts/run_benchmark.py`, do this standardization for you automatically; calling each model's native API directly like this notebook does does not.)
 
 ## On Google Colab
 

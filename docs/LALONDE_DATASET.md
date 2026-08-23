@@ -2,7 +2,7 @@
 
 ## Summary
 
-This repo's benchmark, `RealCause_with_hpo_benchmark.ipynb`, evaluates models on
+This repo's benchmark, `scripts/run_benchmark.py`, evaluates models on
 **RealCause** — a semi-synthetic version of the classic Lalonde dataset that keeps
 the real covariates and treatment assignment but *simulates* the outcomes with a
 fitted generative model, so that a true, individual-level CATE exists to score
@@ -116,8 +116,8 @@ methodology:
   current **v2** averages all 100 and reports different numbers. If you've
   compared against v2, that's why the numbers won't match.
 - **Units**: the paper reports PEHE in units of $1,000. `evaluate_cate`
-  computes PEHE in raw dollars; `RealCause_with_hpo_benchmark.ipynb`'s
-  results table divides by 1,000 before displaying it, to match.
+  computes PEHE in raw dollars; `scripts/run_benchmark.py`'s
+  summary table divides by 1,000 before displaying it, to match.
 
 ### Reference numbers (CausalPFN, from the paper's Table 1)
 
@@ -126,5 +126,5 @@ methodology:
 | Lalonde PSID | 14.40 ± 0.2 | 0.22 ± 0.02 |
 | Lalonde CPS | 8.96 ± 0.02 | 0.13 ± 0.01 |
 
-If your own CausalPFN run through `RealCause_with_hpo_benchmark.ipynb` lands
+If your own CausalPFN run through `scripts/run_benchmark.py` lands
 in this range, your setup is working correctly.

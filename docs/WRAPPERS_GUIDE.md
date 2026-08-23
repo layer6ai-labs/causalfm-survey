@@ -47,9 +47,9 @@ gets this too even though it has no CATE output: both its propensity model
 and its per-arm outcome regressors go through the same `_regressor`/
 `_propensity` helpers as the other five. This needs `FLAML[automl]==2.3.5`
 installed (see `CLAUDE.md`); `hpo=False` has no such dependency.
-`RealCause_with_hpo_benchmark.ipynb` runs the full benchmark with `hpo=True`,
-since a fixed random forest isn't a fair comparison against a tuned one when
-reproducing a paper's numbers.
+`scripts/run_benchmark.py` runs the full benchmark with `hpo=True` (unless
+`--smoke`), since a fixed random forest isn't a fair comparison against a
+tuned one when reproducing a paper's numbers.
 
 For exact, verified example code calling each **foundation** model's native
 API directly (no wrapper) — including every install/environment gotcha

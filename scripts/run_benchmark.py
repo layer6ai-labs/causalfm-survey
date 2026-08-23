@@ -37,8 +37,9 @@ class ModelSpec:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Run the RealCause Lalonde benchmark from "
-            "notebooks/RealCause_with_hpo_benchmark.ipynb."
+            "Run the RealCause Lalonde benchmark: 3 foundation models + 6 "
+            "metalearners (HPO-tuned) on RealCause semi-synthetic Lalonde "
+            "realizations. See docs/LALONDE_DATASET.md."
         ),
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
