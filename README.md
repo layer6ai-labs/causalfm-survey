@@ -71,6 +71,14 @@ python scripts/run_benchmark.py           # full run: 9 models x 2 cohorts x 10 
 
 The Lalonde benchmark: all three foundation models against all six metalearners (HPO-tuned), benchmarked on the RealCause semi-synthetic Lalonde dataset — see [`docs/LALONDE_DATASET.md`](docs/LALONDE_DATASET.md) for what that dataset is and why we use it. A full run is expensive (~105 CPU-hours of FLAML search); results are checkpointed to CSV after every task so an interrupted run doesn't lose progress, and progress is logged to both stdout and `logs/run_benchmark_<timestamp>.log`. Run `python scripts/run_benchmark.py --help` for all options (`--gpu`, `--n-realizations`, `--hpo-time-budget`, `--results-dir`).
 
+### 5. Lalonde Benchmark Results
+
+```bash
+jupyter notebook notebooks/Lalonde_benchmark_results.ipynb
+```
+
+Loads the full production run's output (already checked into `data/benchmark_results_cpu.csv` — all 9 models — and `data/benchmark_results_gpu.csv` — the 3 foundation models, re-run on GPU), averages over the 10 realizations per cohort, and reproduces a summary table plus a rank-vs-runtime figure in the style of CausalPFN's own paper (Figure 1) — CATE accuracy vs. compute cost, at a glance. No benchmark run required; this notebook only reads already-committed results.
+
 ### Running notebooks locally
 
 Every notebook's Colab install cells (`%pip install ...`) silently no-op in this repo's local `uv`-managed venv (it has no `pip` module) — install what you need yourself first, with `uv pip install <pkg>` :
@@ -102,9 +110,13 @@ Hit something not covered here (a stale-import error after re-running a cell, a 
 │   └── wrap_metalearners.py                # S/T/X-learner, Debiased ML, IPW, DR wrappers
 ├── notebooks/
 │   ├── Foundation_models_quickstart.ipynb  # CausalPFN alone, end to end (hand-maintained)
-│   └── Foundation_models_sandbox.ipynb     # All 3 foundation models side by side (hand-maintained)
+│   ├── Foundation_models_sandbox.ipynb     # All 3 foundation models side by side (hand-maintained)
+│   └── Lalonde_benchmark_results.ipynb     # Loads data/*.csv, builds the results table + figure
 ├── scripts/
 │   └── run_benchmark.py                    # The Lalonde benchmark: 9 models, HPO-tuned, RealCause data
+├── data/
+│   ├── benchmark_results_cpu.csv           # Full run output: 9 models x 2 cohorts x 10 realizations
+│   └── benchmark_results_gpu.csv           # Same, foundation models only, re-run on GPU
 ├── docs/
 │   ├── LALONDE_DATASET.md                  # Which Lalonde version this repo benchmarks on, and why
 │   └── WRAPPERS_GUIDE.md                   # causal_bench wrapper internals: HPO, standardization, gotchas

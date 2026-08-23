@@ -45,7 +45,7 @@ There's no dedicated setup/data notebook — synthetic dataset generation is inl
 
 ### Running notebooks
 
-Two notebooks, no numeric ordering — pick based on what you need. (The Lalonde benchmark used to be a third notebook; it's now `scripts/run_benchmark.py` — see the next section.)
+Three notebooks, no numeric ordering — pick based on what you need. (The Lalonde benchmark *run itself* used to be a notebook; it's now `scripts/run_benchmark.py` — see the next section. `Lalonde_benchmark_results.ipynb` below only reads that script's already-committed output, it doesn't run the benchmark.)
 
 **1. Foundation Models Quickstart** (fastest path to one working model):
 ```bash
@@ -62,6 +62,15 @@ jupyter notebook notebooks/Foundation_models_sandbox.ipynb
 - Standalone — calls each library's own native API directly (`CATEEstimator`/`ATEEstimator`, `DoPFNRegressor`, `StandardCATEModel`), not this repo's wrapper classes
 - Simulates one self-contained example dataset inline (a confounded discount-email scenario with known heterogeneous CATE) instead of using `causal_bench.data_generators`
 - One cell per model, each with markdown explaining install/setup and any library-specific gotchas
+
+**3. Lalonde Benchmark Results** (loads and visualizes `scripts/run_benchmark.py`'s output):
+```bash
+jupyter notebook notebooks/Lalonde_benchmark_results.ipynb
+```
+- Reads the production run's already-committed results — `data/benchmark_results_cpu.csv` (all 9 models) and `data/benchmark_results_gpu.csv` (the 3 foundation models, re-run on GPU) — no benchmark run required to use this notebook
+- Averages over the 10 realizations per cohort into a summary table (PEHE in units of $1,000 to match CausalPFN's Table 1 units, plus per-cohort and pooled PEHE/ATE-relative-error ranks), and a rank-vs-runtime figure styled after CausalPFN's own paper Figure 1 (foundation models vs. metalearners vs. Debiased ML called out separately, since it's the best-ranked non-foundation model)
+- Deliberately does **not** normalize runtime "per 1,000 samples" the way the paper's figure axis is labeled: the metalearners' HPO time is a fixed 900s *budget* per sub-model regardless of dataset size (verified directly: CPS has ~6x PSID's sample count but near-identical metalearner runtimes), so normalizing by sample count would make PSID look artificially cheaper for a cost that's actually constant. Raw per-task CPU seconds is used instead.
+- Uses `causal_bench` wrappers only insofar as the CSVs it reads were produced by them — the notebook itself is pure pandas/matplotlib over the CSVs, no model libraries imported
 
 ### Running the benchmark script
 
@@ -93,6 +102,12 @@ a shared Python builder, has also been deleted.
 genuinely expensive unattended run (hours of FLAML search) is a better fit for a backgroundable
 process with a log file than a notebook kernel. The quickstart and sandbox notebooks are
 unaffected and remain hand-maintained, as they always were.
+
+Once a teammate's full production run of `scripts/run_benchmark.py` (~105 CPU-hours) finished
+and its output CSVs were checked into `data/`, **`Lalonde_benchmark_results.ipynb`** was added
+to load and visualize those already-computed results — a table and a paper-style rank-vs-runtime
+figure — without re-running anything. It's a notebook (not a script) because, unlike the
+benchmark run itself, this is fast, interactive, and meant to be tweaked cell-by-cell.
 
 ### Using on Google Colab
 
@@ -165,6 +180,14 @@ class *Wrapper:
 - Does not import `causal_bench` — every foundation model call is that library's own native API, so a cell can be copy-pasted into another project as-is
 - Data is a small inline simulation (not `causal_bench.data_generators`), chosen for a business narrative rather than an abstract `X0, X1, ...` matrix
 - Has a "Reference output" section (real numbers + plot from a verified Colab GPU run, `SEED=42`, image at `assets/reference_output_colab.png`) so practitioners can sanity-check their own run against a known-good one
+- Committed with each code cell's own execution output cleared (`jupyter nbconvert --clear-output --inplace`) — those were transient artifacts of whichever local/Colab run last executed the notebook, not curated content; the static "Reference output" section above is unaffected since it lives in a separate markdown cell + image file, not a cell output
+
+**`Lalonde_benchmark_results.ipynb`** — Loads and visualizes `scripts/run_benchmark.py`'s output, standalone
+- Reads `data/benchmark_results_cpu.csv` / `data/benchmark_results_gpu.csv` directly with pandas — doesn't import `causal_bench` or re-run anything
+- Builds a summary table (PEHE ÷ 1,000 to match CausalPFN's Table 1 units; PEHE and ATE-relative-error, each with a per-cohort and pooled rank) and a rank-vs-runtime figure styled after CausalPFN's own paper Figure 1
+- Colored by group in the figure: Foundation Models, Debiased ML (called out on its own — the best-ranked non-foundation model), and the remaining metalearners
+- Committed **with** its cell outputs (unlike the sandbox notebook above) — the table and figures are the point, so a viewer should see them without needing to run anything locally
+- Hand-maintained, like every notebook in this repo now (see "Notebook history" above)
 
 ### `scripts/`
 
@@ -172,6 +195,10 @@ class *Wrapper:
 - Runs all 3 foundation models + all 6 metalearners (FLAML-tuned via `hpo=True` unless `--smoke`) on RealCause semi-synthetic realizations, replicating CausalPFN's arXiv v1 protocol exactly (see `docs/LALONDE_DATASET.md`)
 - Structured for a genuinely expensive unattended run rather than a quick one: builds the model registry from `--cpu`/`--gpu`/`--smoke`/etc. CLI flags; loads RealCause realizations; runs every (model, cohort, realization) task, appending to `records` and rewriting the results CSV atomically (temp file + `os.replace`) after each one so an interrupted run keeps everything completed so far; logs progress to stdout and `logs/run_benchmark_<timestamp>.log`; prints a summary table at the end (PEHE divided by 1,000 to match the paper's units)
 - Supersedes `RealCause_with_hpo_benchmark.ipynb` (and, transitively, `RealCause_benchmark.ipynb`/`Lalonde_benchmark.ipynb`), all now deleted — see "Notebook history" above
+
+### `data/`
+
+**`benchmark_results_cpu.csv`** / **`benchmark_results_gpu.csv`** — Checked-in output of a teammate's full production `scripts/run_benchmark.py` run (~105 CPU-hours): CPU has all 9 models (2 cohorts x 10 realizations each, 180 rows); GPU has just the 3 foundation models re-run for a realistic-deployment-speed comparison (60 rows). Read directly by `notebooks/Lalonde_benchmark_results.ipynb` — see above.
 
 ## Key caveats & usage notes
 
