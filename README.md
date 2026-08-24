@@ -7,9 +7,9 @@
 <!-- Add the arXiv badge once the paper has a real ID (see arXiv:2609.XXXXX in Citation below):
 [![arXiv](https://img.shields.io/badge/arXiv-2609.XXXXX-b31b1b.svg)](https://arxiv.org/abs/2609.XXXXX) -->
 
-</div>
-
 # Causal Foundation Models Survey
+
+</div>
 
 This repository is the easiest way to start using **Causal Foundational Models** (prior-fitted networks that use in-context learning to estimate causal quantities on new datasets). In this repo, we give a [quickstart](notebooks/Foundation_models_quickstart.ipynb) to get one Causal Foundational Model (CFM) running, a [sandbox](notebooks/Foundation_models_sandbox.ipynb) comparing known CFMs side by side, and a benchmark that runs known CFMs against meta learners on real-world semi-synthetic data ([benchmark script](scripts/run_benchmark.py)) visualized on the [results notebook](notebooks/Lalonde_benchmark_results.ipynb).
 
