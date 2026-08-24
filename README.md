@@ -11,7 +11,9 @@
 
 # Causal Foundation Models Survey
 
-Companion code for the survey on **causal foundation models** (prior-fitted networks that use in-context learning to estimate causal quantities on new datasets). In this repo, we compare three recent causal foundation models (CFMs) against six traditional metalearners on synthetic and real-world causal inference benchmarks.
+This repository is the easiest way to start using **Causal Foundational Models** (prior-fitted networks that use in-context learning to estimate causal quantities on new datasets). In this repo, we give a [quickstart](notebooks/Foundation_models_quickstart.ipynb) to get one Causal Foundational Model (CFM) running, a [sandbox](notebooks/Foundation_models_sandbox.ipynb) comparing known CFMs side by side, and a benchmark that runs known CFMs against meta learners on real-world semi-synthetic data ([benchmark script](scripts/run_benchmark.py)) visualized on the [results notebook](notebooks/Lalonde_benchmark_results.ipynb).
+
+<!-- Companion code for the survey on **causal foundation models** (prior-fitted networks that use in-context learning to estimate causal quantities on new datasets). In this repo, we compare three recent causal foundation models (CFMs) against six traditional metalearners on synthetic and real-world causal inference benchmarks. -->
 
 ## Models Included
 
@@ -34,6 +36,11 @@ Companion code for the survey on **causal foundation models** (prior-fitted netw
 
 ## Quick Start
 
+Every notebook runs on **Google Colab with zero local setup** (click its
+"Open in Colab" badge, see [On Google Colab](#on-google-colab)), or locally
+with the steps below (see [Running notebooks locally](#running-notebooks-locally)
+for per-model dependency installs).
+
 ### 1. Install
 
 Ensure you have `python >=3.10,<3.13`.
@@ -52,7 +59,7 @@ pip install -r requirements.txt
 jupyter notebook notebooks/Foundation_models_quickstart.ipynb
 ```
 
-The fastest path to working with one causal foundation model. Simply install, load your data, split into context and query, then predict — done. No training required for each new inference dataset.
+The fastest path to working with one causal foundation model. Simply install, load your data, split into context and query, then predict. No training required for each new inference dataset.
 
 ### 3. Foundation Models Sandbox
 
@@ -69,7 +76,7 @@ python scripts/run_benchmark.py --smoke   # fast end-to-end check (no HPO, 1 rea
 python scripts/run_benchmark.py           # full run: 9 models x 2 cohorts x 10 realizations, HPO-tuned
 ```
 
-The Lalonde benchmark: all three foundation models against all six metalearners (HPO-tuned), benchmarked on the RealCause semi-synthetic Lalonde dataset — see [`docs/LALONDE_DATASET.md`](docs/LALONDE_DATASET.md) for what that dataset is and why we use it. A full run is expensive (~105 CPU-hours of FLAML search); results are checkpointed to CSV after every task so an interrupted run doesn't lose progress, and progress is logged to both stdout and `logs/run_benchmark_<timestamp>.log`. Run `python scripts/run_benchmark.py --help` for all options (`--gpu`, `--n-realizations`, `--hpo-time-budget`, `--results-dir`).
+The Lalonde benchmark: three foundation models (Causal PFN, Do-PFN, and CausalFM) against six metalearners (HPO-tuned), benchmarked on the RealCause semi-synthetic Lalonde dataset (see [`docs/LALONDE_DATASET.md`](docs/LALONDE_DATASET.md) for what that dataset is and why we use it). A full run is expensive (~105 CPU-hours of FLAML search); results are checkpointed to CSV, and progress is logged to both stdout and `logs/run_benchmark_<timestamp>.log`. Run `python scripts/run_benchmark.py --help` for all options (`--gpu`, `--n-realizations`, `--hpo-time-budget`, `--results-dir`).
 
 ### 5. Lalonde Benchmark Results
 
@@ -77,7 +84,7 @@ The Lalonde benchmark: all three foundation models against all six metalearners 
 jupyter notebook notebooks/Lalonde_benchmark_results.ipynb
 ```
 
-Loads the full production run's output (already checked into `data/benchmark_results_cpu.csv` — all 9 models — and `data/benchmark_results_gpu.csv` — the 3 foundation models, re-run on GPU), averages over the 10 realizations per cohort, and reproduces a summary table plus a rank-vs-runtime figure in the style of CausalPFN's own paper (Figure 1) — CATE accuracy vs. compute cost, at a glance. No benchmark run required; this notebook only reads already-committed results.
+Loads the full production run's output (already checked into `data/benchmark_results_cpu.csv`, all 9 models, and `data/benchmark_results_gpu.csv`, the 3 foundation models, re-run on GPU), averages over the 10 realizations per cohort, and reproduces a summary table plus a rank-vs-runtime figure, CATE accuracy vs. compute cost, at a glance.
 
 ### Running notebooks locally
 
@@ -93,6 +100,17 @@ Apple Silicon Macs: CausalPFN segfaults on both CPU and MPS and is skipped autom
 `scripts/run_benchmark.py` needs all four dependency groups above installed at once (it runs all 9 models), plus `git clone`s of Do-PFN and CausalFM-toolkit under `notebooks/` (same layout the sandbox notebook uses).
 
 Hit something not covered here (a stale-import error after re-running a cell, a version-pin conflict, etc.)? See [`CLAUDE.md`](CLAUDE.md).
+
+### On Google Colab
+
+Each notebook includes an "Open in Colab" badge. Click it to run directly on Colab (all installs happen automatically). Alternatively:
+
+1. Open Colab: https://colab.research.google.com
+2. File → Open notebook → GitHub
+3. Paste this repo URL and select a notebook
+4. Run all cells top-to-bottom
+
+**Note**: Foundation models that require checkpoints (CausalFM) or external repos (Do-PFN) are installed on first use in the notebook.
 
 ## Repository Structure
 
@@ -145,7 +163,7 @@ All models evaluated on:
 - **Coverage @95%**: Fraction of true τ inside model's 95% confidence interval (when available)
 - **Runtime**: Seconds (fit + predict on test set)
 
-## Usage Examples
+<!-- ## Usage Examples
 
 ### Run one model on one dataset (Python)
 
@@ -161,22 +179,7 @@ cate_hat = np.asarray(cate_estimator.estimate_cate(X_qry)).reshape(-1)
 ate_estimator = ATEEstimator(device=device, verbose=False)
 ate_estimator.fit(X_ctx, T_ctx, Y_ctx)
 ate_hat = float(np.asarray(ate_estimator.estimate_ate()).reshape(-1)[0])
-```
-
-### Compare models programmatically
-
-See [`Foundation_models_sandbox.ipynb`](notebooks/Foundation_models_sandbox.ipynb) which runs CausalPFN, Do-PFN, and CausalFM side by side on the same dataset, then plots predicted-vs-true CATE and a PEHE bar chart for them.
-
-## On Google Colab
-
-Each notebook includes an "Open in Colab" badge. Click it to run directly on Colab (all installs happen automatically). Alternatively:
-
-1. Open Colab: https://colab.research.google.com
-2. File → Open notebook → GitHub
-3. Paste this repo URL and select a notebook
-4. Run all cells top-to-bottom
-
-**Note**: Foundation models that require checkpoints (CausalFM) or external repos (Do-PFN) are installed on first use in the notebook.
+``` -->
 
 ## Citation
 
