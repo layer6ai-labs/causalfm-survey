@@ -11,7 +11,7 @@
 
 </div>
 
-This repository is the easiest way to start using **Causal Foundational Models** (prior-fitted networks that use in-context learning to estimate causal quantities on new datasets). In this repo, we give a [quickstart](notebooks/Foundation_models_quickstart.ipynb) to get one Causal Foundational Model (CFM) running, a [sandbox](notebooks/Foundation_models_sandbox.ipynb) comparing known CFMs side by side, and a benchmark that runs known CFMs against meta learners on real-world semi-synthetic data ([benchmark script](scripts/run_benchmark.py)) visualized on the [results notebook](notebooks/Lalonde_benchmark_results.ipynb).
+This repository is the easiest way to start using **Causal Foundational Models** (prior-fitted networks that use in-context learning to estimate causal quantities on new datasets). In this repo, we give a [quickstart](notebooks/Foundation_models_quickstart.ipynb) to get one Causal Foundational Model (CFM) running, a [sandbox](notebooks/Foundation_models_sandbox.ipynb) comparing known CFMs side by side, and a benchmark that runs known CFMs against meta learners on real-world semi-synthetic data ([benchmark script](scripts/run_benchmark.py)) visualized in the [results notebook](notebooks/Lalonde_benchmark_results.ipynb).
 
 <!-- Companion code for the survey on **causal foundation models** (prior-fitted networks that use in-context learning to estimate causal quantities on new datasets). In this repo, we compare three recent causal foundation models (CFMs) against six traditional metalearners on synthetic and real-world causal inference benchmarks. -->
 
@@ -24,7 +24,7 @@ This repository is the easiest way to start using **Causal Foundational Models**
 | **Do-PFN** | Robertson, Reuter et al., *Do-PFN: In-Context Learning for Causal Effect Estimation*, NeurIPS 2025 | [jr2021/Do-PFN](https://github.com/jr2021/Do-PFN) |
 | **CausalFM** | Ma, Frauen, et al., *Foundation Models for Causal Inference via Prior-Data Fitted Networks*, ICLR 2026 | [yccm/CausalFM-toolkit](https://github.com/yccm/CausalFM-toolkit) |
 
-### Metalearners (from econml)
+### Metalearners (from EconML)
 | Method | Description |
 |---|---|
 | **S-learner** | Single-model learner: trains one model on covariates + treatment |
@@ -91,8 +91,8 @@ Loads the full production run's output (already checked into `data/benchmark_res
 Every notebook's Colab install cells (`%pip install ...`) silently no-op in this repo's local `uv`-managed venv (it has no `pip` module) — install what you need yourself first, with `uv pip install <pkg>` :
 
 - **CausalPFN**: `uv pip install causalpfn`
-- **Do-PFN**: `uv pip install networkx tqdm einops "torch<2.10"` — not on PyPI, notebooks `git clone` it automatically; `torch<2.10` is required (Do-PFN breaks on newer)
-- **CausalFM**: `uv pip install einops "tabpfn==2.0.9" tensorboard` — also not on PyPI, cloned automatically
+- **Do-PFN**: `uv pip install networkx tqdm einops "torch<2.10"`. Do-PFN is not on PyPI, notebooks `git clone` it automatically; `torch<2.10` is required (Do-PFN breaks on newer)
+- **CausalFM**: `uv pip install einops "tabpfn==2.0.9" tensorboard`. CausalFM is also not on PyPI, cloned automatically
 - **Metalearners**: `uv pip install econml causalml "FLAML[automl]==2.3.5"`.
 
 Apple Silicon Macs: CausalPFN segfaults on both CPU and MPS and is skipped automatically; Do-PFN and CausalFM both run fine on CPU, just slower than on a GPU.
@@ -150,8 +150,8 @@ Each notebook includes an "Open in Colab" badge. Click it to run directly on Col
 
 | Name | Source | Notes |
 |---|---|---|
-| Lalonde (`load_lalonde`) | Real NSW vs. PSID data | No ground-truth CATE, but a true experimental ATE is available (`ds.ate`) |
-| RealCause Lalonde (`load_lalonde_realcause`) | PSID + CPS, 10 realizations each | Semi-synthetic realizations over real covariates — gives individual-level CATE ground truth; matches CausalPFN's paper methodology |
+| Lalonde (`load_lalonde`) | Real NSW vs. PSID data | No ground-truth CATE, but a true experimental ATE is available (`ds.ate`). ([Dehejia et al., 1999](https://www.jstor.org/stable/2669919)) |
+| RealCause Lalonde (`load_lalonde_realcause`) | PSID + CPS, 10 realizations each | Semi-synthetic realizations over real covariates — gives individual-level CATE ground truth. ([Neal et al., 2020](https://arxiv.org/abs/2011.15007)) |
 
 ## Metrics
 
