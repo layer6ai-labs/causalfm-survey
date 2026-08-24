@@ -3,7 +3,7 @@
 ## Summary
 
 This repo's benchmark, `scripts/run_benchmark.py`, evaluates models on
-**RealCause** — a semi-synthetic version of the classic Lalonde dataset that keeps
+**RealCause**, a semi-synthetic version of the classic Lalonde dataset that keeps
 the real covariates and treatment assignment but *simulates* the outcomes with a
 fitted generative model, so that a true, individual-level CATE exists to score
 against. That's the whole reason we use it: the real Lalonde data can supply a
@@ -68,17 +68,17 @@ outcome-generating process** that can be queried for both:
    distribution of `(X, T, Y)` observed in that real data: learn, from real
    examples, what outcome a unit with these covariates tends to produce
    under a given treatment.
-3. Query that fitted model twice for the **same** unit — once conditioned on
-   `T=0`, once on `T=1`. A real-world unit can only ever receive one
+3. Query that fitted model twice for the **same** unit (once conditioned on
+   `T=0`, once on `T=1`). A real-world unit can only ever receive one
    treatment, but a fitted model has no such restriction: it will generate a
    draw under either condition on request. This gives simulated potential
    outcomes `y0` and `y1` for *every* unit, and therefore a known individual
-   treatment effect `ite = y1 - y0` for every unit — exactly the quantity
-   real data can never supply.
+   treatment effect `ite = y1 - y0` for every unit (exactly the quantity
+   real data can never supply).
 
 So a RealCause "realization" of Lalonde has the real covariates and real
 treatment assignment, but outcomes drawn from a fitted generative model
-rather than observed in reality — real `X` and `T`, simulated `Y`. We use
+rather than observed in reality (real `X` and `T`, simulated `Y`). We use
 this as the benchmark's primary data specifically because it's the only
 version of this dataset where an individual-level ground truth exists to
 check a model's CATE estimates against at all.
@@ -86,7 +86,7 @@ check a model's CATE estimates against at all.
 ### What "realizations" means
 
 RealCause fits one generative model per cohort (PSID or CPS). Each
-"realization" is one independent sample drawn from that fitted model — the
+"realization" is one independent sample drawn from that fitted model, the
 same real covariates and treatment assignment every time, but a different
 simulated draw of `y0`/`y1` (and therefore a different `ite`) each time.
 CausalPFN's repo ships 100 such pre-computed realizations per cohort
@@ -118,13 +118,3 @@ methodology:
 - **Units**: the paper reports PEHE in units of $1,000. `evaluate_cate`
   computes PEHE in raw dollars; `scripts/run_benchmark.py`'s
   summary table divides by 1,000 before displaying it, to match.
-
-### Reference numbers (CausalPFN, from the paper's Table 1)
-
-| Cohort | Mean PEHE (×10³) | Mean ATE relative error |
-|---|---|---|
-| Lalonde PSID | 14.40 ± 0.2 | 0.22 ± 0.02 |
-| Lalonde CPS | 8.96 ± 0.02 | 0.13 ± 0.01 |
-
-If your own CausalPFN run through `scripts/run_benchmark.py` lands
-in this range, your setup is working correctly.
