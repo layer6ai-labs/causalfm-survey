@@ -10,6 +10,7 @@ data_cache/
 *.csv
 !data/benchmark_results_cpu.csv
 !data/benchmark_results_gpu.csv
+!data/dr_learner_rerun.csv
 *.png
 !assets/*.png
 *.pth
