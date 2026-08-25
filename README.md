@@ -134,7 +134,8 @@ Each notebook includes an "Open in Colab" badge. Click it to run directly on Col
 │   └── run_benchmark.py                    # The Lalonde benchmark: 9 models, HPO-tuned, RealCause data
 ├── data/
 │   ├── benchmark_results_cpu.csv           # Full run output: 9 models x 2 cohorts x 10 realizations
-│   └── benchmark_results_gpu.csv           # Same, foundation models only, re-run on GPU
+│   ├── benchmark_results_gpu.csv           # Same, foundation models only, re-run on GPU
+│   └── dr_learner_rerun.csv                # DR-Learner CPU rerun (fixes an outlier realization), swapped into benchmark_results_cpu.csv rows
 ├── docs/
 │   ├── LALONDE_DATASET.md                  # Which Lalonde version this repo benchmarks on, and why
 │   └── WRAPPERS_GUIDE.md                   # causal_bench wrapper internals: HPO, standardization, gotchas
