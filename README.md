@@ -7,7 +7,7 @@
 <!-- Add the arXiv badge once the paper has a real ID (see arXiv:2609.XXXXX in Citation below):
 [![arXiv](https://img.shields.io/badge/arXiv-2609.XXXXX-b31b1b.svg)](https://arxiv.org/abs/2609.XXXXX) -->
 
-# Causal Foundation Models Survey
+# Causal Foundation Models
 
 </div>
 
@@ -184,7 +184,7 @@ ate_hat = float(np.asarray(ate_estimator.estimate_ate()).reshape(-1)[0])
 
 ## Citation
 
-If you find this code and survey helpful, please cite the paper as follows
+If you find this repository useful, please cite the paper as follows
 
 ```bibtex
 @article{stith2026cfm,
