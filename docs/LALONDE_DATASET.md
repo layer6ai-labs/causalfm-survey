@@ -8,7 +8,7 @@ the real covariates and treatment assignment but *simulates* the outcomes with a
 fitted generative model, so that a true, individual-level CATE exists to score
 against. That's the whole reason we use it: the real Lalonde data can supply a
 true population-level *ATE*, but it can never supply an individual-level CATE (
-the actual quantity this survey is about ) because in reality you only ever
+the actual quantity this work is about ) because in reality you only ever
 observe one of a unit's two potential outcomes, never both.
 
 The rest of this page explains what the real Lalonde data is and why it isn't
@@ -42,13 +42,13 @@ loads this data (with an optional `variant="nsw_psid_trimmed"` that restricts
 the PSID controls to common propensity-score support, since the untrimmed
 comparison has very little covariate overlap with the treated group).
 
-**Why this alone isn't enough for this survey**: even in the best case ( a
+**Why this alone isn't enough for this benchmark**: even in the best case ( a
 randomized experiment like NSW's, which most real-world datasets don't even
 have) real data only ever tells you the *population-level* effect. It can
 never tell you the *individual-level* effect, because every unit receives
 exactly one treatment and shows exactly one outcome. A unit's outcome under
 the treatment it *didn't* receive is simply never observed, for anyone, ever
-— the fundamental problem of causal inference. Since this survey is about how
+— the fundamental problem of causal inference. Since this work is about how
 well causal foundation models estimate *individual-level* (CATE) effects, not
 just population averages, real data structurally cannot serve as its main
 benchmark. That's what RealCause is for.

@@ -3,9 +3,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "causal-fm-survey"
+name = "cfms"
 version = "0.1.0"
-description = "Benchmark companion code for survey on causal foundation models (CausalPFN, Do-PFN, CausalFM) vs. traditional metalearners"
+description = "Benchmark companion code comparing causal foundation models (CausalPFN, Do-PFN, CausalFM) against traditional metalearners"
 readme = "README.md"
 requires-python = ">=3.10,<3.13"
 authors = [

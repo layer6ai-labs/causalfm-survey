@@ -13,8 +13,6 @@
 
 This repository is the easiest way to start using **Causal Foundational Models** (prior-fitted networks that use in-context learning to estimate causal quantities on new datasets). In this repo, we give a [quickstart](notebooks/Foundation_models_quickstart.ipynb) to get one Causal Foundational Model (CFM) running, a [sandbox](notebooks/Foundation_models_sandbox.ipynb) comparing known CFMs side by side, and a benchmark that runs known CFMs against meta learners on real-world semi-synthetic data ([benchmark script](scripts/run_benchmark.py)) visualized in the [results notebook](notebooks/Lalonde_benchmark_results.ipynb).
 
-<!-- Companion code for the survey on **causal foundation models** (prior-fitted networks that use in-context learning to estimate causal quantities on new datasets). In this repo, we compare three recent causal foundation models (CFMs) against six traditional metalearners on synthetic and real-world causal inference benchmarks. -->
-
 ## Models Included
 
 ### Foundation Models (In-Context Learning)
