@@ -30,10 +30,12 @@ This repository is the easiest way to start using **Causal Foundational Models**
 
 ## Quick Start
 
-Every notebook runs on **Google Colab with zero local setup** (click its
-"Open in Colab" badge, see [On Google Colab](#on-google-colab)), or locally
-with the steps below (see [Running notebooks locally](#running-notebooks-locally)
-for per-model dependency installs).
+Every notebook can run on **Google Colab with zero local setup** (see
+[On Google Colab](#on-google-colab)) — Colab badges are unavailable in
+this anonymized double-blind review copy, since opening one requires
+exposing the repository path — or locally with the steps below (see
+[Running notebooks locally](#running-notebooks-locally) for per-model
+dependency installs).
 
 ### 1. Install
 
@@ -97,12 +99,13 @@ Hit something not covered here (a stale-import error after re-running a cell, a 
 
 ### On Google Colab
 
-Each notebook includes an "Open in Colab" badge. Click it to run directly on Colab (all installs happen automatically). Alternatively:
-
-1. Open Colab: https://colab.research.google.com
-2. File → Open notebook → GitHub
-3. Paste this repo URL and select a notebook
-4. Run all cells top-to-bottom
+Each notebook normally includes an "Open in Colab" badge for one-click,
+zero-install execution. **Colab is unavailable in this anonymized review
+copy** — opening a notebook on Colab requires cloning it from its GitHub
+path, which would expose the repository (and therefore the authors) during
+double-blind review. Please run notebooks locally instead (see
+[Running notebooks locally](#running-notebooks-locally)); Colab support
+returns in the de-anonymized repository after review.
 
 **Note**: Foundation models that require checkpoints (CausalFM) or external repos (Do-PFN) are installed on first use in the notebook.
 
