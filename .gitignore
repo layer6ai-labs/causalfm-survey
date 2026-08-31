@@ -12,8 +12,6 @@ data_cache/
 !data/benchmark_results_gpu.csv
 *.png
 !assets/*.png
-# Untracked for the double-blind TMLR submission -- re-add after review (see README/LICENSE anonymization)
-assets/layer6.png
 *.pth
 *.ipynb_checkpoints/
 .ipynb_checkpoints/
