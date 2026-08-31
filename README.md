@@ -1,11 +1,7 @@
 <div align="center">
 
-<a href="https://layer6.ai"><img src="assets/layer6.png" alt="Layer 6 AI" width="220"></a>
-
 [![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue)](pyproject.toml)
-[![License: MIT](https://img.shields.io/github/license/layer6ai-labs/cfms)](LICENSE)
-<!-- Add the arXiv badge once the paper has a real ID (see arXiv:2609.XXXXX in Citation below):
-[![arXiv](https://img.shields.io/badge/arXiv-2609.XXXXX-b31b1b.svg)](https://arxiv.org/abs/2609.XXXXX) -->
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 # Causal Foundation Models
 
@@ -181,17 +177,8 @@ ate_hat = float(np.asarray(ate_estimator.estimate_ate()).reshape(-1)[0])
 
 ## Citation
 
-If you find this repository useful, please cite the paper as follows
-
-```bibtex
-@article{stith2026cfm,
-  title={Causal Foundation Models},
-  author={Stith, Christopher and Rahmani, Hossein and Cresswell, Jesse C},
-  journal={arXiv:2609.XXXXX},
-  year={2026}
-}
-```
+Citation withheld for double-blind review.
 
 ## License
 
-This code is licensed under the MIT License, copyright by Layer 6 AI.
+This code is licensed under the MIT License (see [LICENSE](LICENSE)).
