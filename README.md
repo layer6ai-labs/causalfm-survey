@@ -99,12 +99,12 @@ Hit something not covered here (a stale-import error after re-running a cell, a 
 
 ### On Google Colab
 
-Each notebook normally includes an "Open in Colab" badge for one-click,
-zero-install execution. **Colab is unavailable in this anonymized review
-copy** — opening a notebook on Colab requires cloning it from its GitHub
+**Colab is unavailable in this anonymized review
+copy** because opening a notebook on Colab requires cloning it from its GitHub
 path, which would expose the repository (and therefore the authors) during
-double-blind review. Please run notebooks locally instead (see
-[Running notebooks locally](#running-notebooks-locally)); Colab support
+double-blind review.
+
+Please run notebooks locally instead (see [Running notebooks locally](#running-notebooks-locally)); Colab support
 returns in the de-anonymized repository after review.
 
 **Note**: Foundation models that require checkpoints (CausalFM) or external repos (Do-PFN) are installed on first use in the notebook.
