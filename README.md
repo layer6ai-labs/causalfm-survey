@@ -4,8 +4,7 @@
 
 [![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue)](pyproject.toml)
 [![License: MIT](https://img.shields.io/github/license/layer6ai-labs/cfms)](LICENSE)
-<!-- Add the arXiv badge once the paper has a real ID (see arXiv:2609.XXXXX in Citation below):
-[![arXiv](https://img.shields.io/badge/arXiv-2609.XXXXX-b31b1b.svg)](https://arxiv.org/abs/2609.XXXXX) -->
+[![arXiv](https://img.shields.io/badge/arXiv-2609.03003-b31b1b.svg)](https://arxiv.org/abs/2609.03003)
 
 # Causal Foundation Models
 
@@ -184,11 +183,14 @@ ate_hat = float(np.asarray(ate_estimator.estimate_ate()).reshape(-1)[0])
 If you find this repository useful, please cite the paper as follows
 
 ```bibtex
-@article{stith2026cfm,
-  title={Causal Foundation Models},
-  author={Stith, Christopher and Rahmani, Hossein and Cresswell, Jesse C},
-  journal={arXiv:2609.XXXXX},
-  year={2026}
+@misc{stith2026causalfoundationmodels,
+      title={Causal Foundation Models}, 
+      author={Christopher Stith and Hossein Rahmani and Jesse C. Cresswell},
+      year={2026},
+      eprint={2609.03003},
+      archivePrefix={arXiv},
+      primaryClass={cs.LG},
+      url={https://arxiv.org/abs/2609.03003}, 
 }
 ```
 
