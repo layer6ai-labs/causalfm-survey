@@ -1,3 +1,11 @@
+"""Evaluation library and model wrappers for the CFM benchmark."""
+
+# Must run before anything can import causalpfn (which imports faiss before
+# torch and segfaults on Apple Silicon). No-op on every other platform.
+from .macos_compat import ensure_causalpfn_importable, needs_faiss_shim, shim_active
+
+ensure_causalpfn_importable()
+
 from .data_generators import (
     SyntheticDataset,
     get_dataset,
@@ -27,6 +35,9 @@ from .wrap_metalearners import (
 )
 
 __all__ = [
+    "ensure_causalpfn_importable",
+    "needs_faiss_shim",
+    "shim_active",
     "SyntheticDataset",
     "get_dataset",
     "list_datasets",

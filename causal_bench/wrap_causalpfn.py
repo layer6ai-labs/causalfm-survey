@@ -13,7 +13,6 @@ The first call downloads pretrained weights from the Hugging Face Hub
 """
 
 from __future__ import annotations
-import platform
 import warnings
 import numpy as np
 
@@ -73,12 +72,20 @@ class CausalPFNWrapper(_StandardizedFoundationWrapper):
 
     @classmethod
     def is_available(cls) -> bool:
-        # CausalPFN segfaults on Apple Silicon macOS -- a hard process crash,
-        # not a catchable exception -- on both CPU and MPS (likely an
-        # unstable scaled_dot_product_attention kernel, not a CUDA
-        # requirement). Report unavailable here rather than let `fit()`
-        # crash the interpreter. Fine on Colab (CPU or GPU).
-        if platform.system() == "Darwin" and platform.machine() == "arm64":
+        # CausalPFN used to be reported unavailable on Apple Silicon macOS,
+        # where importing it segfaults the interpreter. The cause is not an
+        # unstable attention kernel: causalpfn imports faiss before torch, and
+        # the two ship separate libomp copies that cannot share a process on
+        # arm64. `causal_bench.macos_compat` swaps in a NumPy k-NN shim (see
+        # that module) so there is only ever one OpenMP runtime, which makes
+        # the platform work rather than merely skip.
+        #
+        # Still a segfault if the shim cannot be installed -- a hard process
+        # crash, not a catchable exception -- so the platform check stays
+        # ahead of the import rather than becoming a try/except.
+        from .macos_compat import ensure_causalpfn_importable
+
+        if not ensure_causalpfn_importable():
             return False
         try:
             from causalpfn import CATEEstimator, ATEEstimator  # noqa: F401
