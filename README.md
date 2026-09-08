@@ -183,14 +183,11 @@ ate_hat = float(np.asarray(ate_estimator.estimate_ate()).reshape(-1)[0])
 If you find this repository useful, please cite the paper as follows
 
 ```bibtex
-@misc{stith2026causalfoundationmodels,
+@rticle{stith2026causalfoundationmodels,
       title={Causal Foundation Models}, 
       author={Christopher Stith and Hossein Rahmani and Jesse C. Cresswell},
       year={2026},
-      eprint={2609.03003},
-      archivePrefix={arXiv},
-      primaryClass={cs.LG},
-      url={https://arxiv.org/abs/2609.03003}, 
+      journal={arXiv:2609.03003}
 }
 ```
 
