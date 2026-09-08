@@ -5,6 +5,7 @@
 [![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue)](pyproject.toml)
 [![License: MIT](https://img.shields.io/github/license/layer6ai-labs/cfms)](LICENSE)
 [![arXiv](https://img.shields.io/badge/arXiv-2609.03003-b31b1b.svg)](https://arxiv.org/abs/2609.03003)
+[![Hugging Face Papers](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Papers-yellow)](https://huggingface.co/papers/2609.03003)
 
 # Causal Foundation Models
 
@@ -183,7 +184,7 @@ ate_hat = float(np.asarray(ate_estimator.estimate_ate()).reshape(-1)[0])
 If you find this repository useful, please cite the paper as follows
 
 ```bibtex
-@rticle{stith2026causalfoundationmodels,
+@article{stith2026causalfoundationmodels,
       title={Causal Foundation Models}, 
       author={Christopher Stith and Hossein Rahmani and Jesse C. Cresswell},
       year={2026},
