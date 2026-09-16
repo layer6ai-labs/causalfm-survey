@@ -56,6 +56,12 @@ dev-dependencies = [
     "mypy",
 ]
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "slow: downloads pretrained weights or runs a full model pass",
+]
+
 [tool.ruff]
 line-length = 100
 target-version = "py39"
