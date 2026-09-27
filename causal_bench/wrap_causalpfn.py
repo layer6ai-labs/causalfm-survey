@@ -5,15 +5,15 @@ a common `.fit(X, T, Y)` / `.predict(X)` interface for the benchmark.
 CausalPFN: Balazadeh et al., "CausalPFN: Amortized Causal Effect Estimation
 via In-Context Learning", arXiv:2506.07918.
 
-Install:
-    pip install causalpfn
+Install (pinned to an upstream commit until a release newer than 0.1.4 is on
+PyPI -- see pyproject.toml):
+    pip install "causalpfn @ git+https://github.com/vdblm/CausalPFN@896a2617adbf9bec1cb2ea0926ca4a28fc48990b"
 
 The first call downloads pretrained weights from the Hugging Face Hub
 (~ a few hundred MB), so an internet connection is required on first run.
 """
 
 from __future__ import annotations
-import warnings
 from typing import Optional
 import numpy as np
 
@@ -81,21 +81,6 @@ class CausalPFNWrapper(_StandardizedFoundationWrapper):
 
     @classmethod
     def is_available(cls) -> bool:
-        # CausalPFN used to be reported unavailable on Apple Silicon macOS,
-        # where importing it segfaults the interpreter. The cause is not an
-        # unstable attention kernel: causalpfn imports faiss before torch, and
-        # the two ship separate libomp copies that cannot share a process on
-        # arm64. `causal_bench.macos_compat` swaps in a NumPy k-NN shim (see
-        # that module) so there is only ever one OpenMP runtime, which makes
-        # the platform work rather than merely skip.
-        #
-        # Still a segfault if the shim cannot be installed -- a hard process
-        # crash, not a catchable exception -- so the platform check stays
-        # ahead of the import rather than becoming a try/except.
-        from .macos_compat import ensure_causalpfn_importable
-
-        if not ensure_causalpfn_importable():
-            return False
         try:
             from causalpfn import CATEEstimator, ATEEstimator  # noqa: F401
 
@@ -115,10 +100,10 @@ class CausalPFNWrapper(_StandardizedFoundationWrapper):
         are out of that distribution. Only a linear rescaling, so CATE/ATE are
         converted back to the original outcome scale in `predict`/`estimate_ate`.
 
-        CausalPFN 0.1.4 asks FAISS for ``num_neighbours`` from each arm even
-        when an arm is smaller, in which case FAISS returns -1 sentinels. By
-        default this wrapper caps k to the smaller arm and half the context
-        limit; set ``cap_num_neighbours=False`` only for exact upstream behavior.
+        By default this wrapper caps k to the *smaller* arm and half the
+        context limit, which is how ``data/benchmark_results_*.csv`` were
+        produced. Upstream caps each arm separately instead; set
+        ``cap_num_neighbours=False`` to get exactly that behavior.
         """
         self._reset_fit_state()
         X_arr, T_arr, Y_arr = self._validate_fit_data(X, T, Y)
@@ -134,18 +119,6 @@ class CausalPFNWrapper(_StandardizedFoundationWrapper):
             )
         else:
             self._effective_num_neighbours = self.num_neighbours
-            if (
-                self.num_neighbours > min_arm_size
-                or 2 * self.num_neighbours > self.max_context_length
-            ):
-                warnings.warn(
-                    "cap_num_neighbours=False preserves upstream behavior, but the "
-                    "requested k exceeds an arm size or half the context limit; "
-                    "FAISS can return -1 sentinel neighbors or CausalPFN can exceed "
-                    "max_context_length.",
-                    RuntimeWarning,
-                    stacklevel=2,
-                )
 
         self._X_train, self._Y_train = self._fit_scalers(X_arr, Y_arr)
         self._T_train = T_arr
@@ -217,20 +190,14 @@ class CausalPFNWrapper(_StandardizedFoundationWrapper):
         everything and it is the ATE. The interval is the posterior over the
         *mean* effect, which is narrower than averaging per-unit intervals and
         is the quantity a "how big could this be?" question wants.
-
-        Works around a bug in causalpfn 0.1.4: its own ``estimate_ate_CI``
-        reads ``output["ate"]`` from a helper that never sets that key, so the
-        public method raises ``KeyError`` on every call. The helper itself is
-        fine, so this calls it directly and supplies the point estimate.
         """
         X_s = self._transform_x(X)
-        estimator = self._ensure_cate_estimator()
-        out = estimator._estimate_ate_cate_CI(
+        out = self._ensure_cate_estimator().estimate_ate_CI(
             X_s, alpha=alpha, n_samples=n_samples or self.interval_n_samples
         )
-        point = float(np.asarray(estimator.estimate_cate(X_s)).reshape(-1).mean())
-        lo = float(np.asarray(out["ate_lower_bound"]).reshape(-1)[0])
-        hi = float(np.asarray(out["ate_upper_bound"]).reshape(-1)[0])
+        point = float(np.asarray(out["ate"]).reshape(-1)[0])
+        lo = float(np.asarray(out["lower_bound"]).reshape(-1)[0])
+        hi = float(np.asarray(out["upper_bound"]).reshape(-1)[0])
         return (
             float(self._unscale_effect(point)),
             float(self._unscale_effect(lo)),

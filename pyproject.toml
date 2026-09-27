@@ -22,7 +22,10 @@ dependencies = [
     "nbformat",
     "jupyter",
     "torch<2.10",
-    "causalpfn",
+    # Pinned to the upstream commit that fixes the Apple Silicon segfault and
+    # estimate_ate_CI (vdblm/CausalPFN#14); the 0.1.4 PyPI release predates it.
+    # Switch back to a plain version pin once a newer release is published.
+    "causalpfn @ git+https://github.com/vdblm/CausalPFN@896a2617adbf9bec1cb2ea0926ca4a28fc48990b",
 ]
 
 [project.optional-dependencies]
@@ -46,6 +49,10 @@ dev = [
     "mypy",
 ]
 
+# Needed for the git-pinned causalpfn dependency above.
+[tool.hatch.metadata]
+allow-direct-references = true
+
 [tool.hatch.build.targets.wheel]
 packages = ["causal_bench"]
 
@@ -55,11 +62,13 @@ dev-dependencies = [
     "ruff",
     "mypy",
 ]
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-markers = [
-    "slow: downloads pretrained weights or runs a full model pass",
+# shap/sparse (via econml and causalml) depend on numba with no lower bound,
+# so the lockfile otherwise resolves numba 0.53.1 / llvmlite 0.36.0, which
+# predate Python 3.10 and fail to build. These floors are the first releases
+# with Python 3.10-3.12 wheels.
+constraint-dependencies = [
+    "numba>=0.59",
+    "llvmlite>=0.42",
 ]
 
 [tool.ruff]

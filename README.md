@@ -5,6 +5,7 @@
 [![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue)](pyproject.toml)
 [![License: MIT](https://img.shields.io/github/license/layer6ai-labs/cfms)](LICENSE)
 [![arXiv](https://img.shields.io/badge/arXiv-2609.03003-b31b1b.svg)](https://arxiv.org/abs/2609.03003)
+[![Hugging Face Papers](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Papers-yellow)](https://huggingface.co/papers/2609.03003)
 
 # Causal Foundation Models
 
@@ -43,8 +44,8 @@ for per-model dependency installs).
 Ensure you have `python >=3.10,<3.13`.
 
 ```bash
-# With uv (recommended):
-uv sync
+# With uv (recommended): everything -- core, metalearners, CausalFM deps
+uv sync --all-extras
 
 # Or with pip:
 pip install -r requirements.txt
@@ -85,14 +86,14 @@ Loads the full production run's output (already checked into `data/benchmark_res
 
 ### Running notebooks locally
 
-Every notebook's Colab install cells (`%pip install ...`) silently no-op in this repo's local `uv`-managed venv (it has no `pip` module) — install what you need yourself first, with `uv pip install <pkg>` :
+Every notebook's Colab install cells (`%pip install ...`) silently no-op in this repo's local `uv`-managed venv (it has no `pip` module). `uv sync --all-extras` installs everything below except Do-PFN's `networkx` (already pulled in by torch) and the two `git clone`s; to install a single group by hand instead:
 
-- **CausalPFN**: `uv pip install causalpfn`
+- **CausalPFN**: already a core dependency (`uv sync`), pinned to an upstream commit because the 0.1.4 PyPI release predates its Apple Silicon fix. Standalone: `uv pip install "causalpfn @ git+https://github.com/vdblm/CausalPFN@896a2617adbf9bec1cb2ea0926ca4a28fc48990b"`
 - **Do-PFN**: `uv pip install networkx tqdm einops "torch<2.10"`. Do-PFN is not on PyPI, notebooks `git clone` it automatically; `torch<2.10` is required (Do-PFN breaks on newer)
 - **CausalFM**: `uv pip install einops "tabpfn==2.0.9" tensorboard`. CausalFM is also not on PyPI, cloned automatically
 - **Metalearners**: `uv pip install econml causalml "FLAML[automl]==2.3.5"`.
 
-Apple Silicon Macs: all three foundation models run. CausalPFN used to segfault here on both CPU and MPS and was skipped automatically — the cause turned out to be a duplicate OpenMP runtime (`causalpfn` imports `faiss` before `torch`, and `faiss-cpu` and `torch` each bundle their own `libomp.dylib`), not an unstable attention kernel. `causal_bench` now swaps in a NumPy stand-in for the one `IndexFlatL2` call CausalPFN makes, so only one OpenMP runtime ever loads; CATE estimates are bitwise identical to real faiss and torch keeps all its threads. Import `causal_bench` **before** `faiss` or `causalpfn` for this to take effect, or set `CFMS_NO_FAISS_SHIM=1` to opt out. Full write-up, including the replication of this repo's own Lalonde numbers on arm64: [`docs/APPLE_SILICON.md`](docs/APPLE_SILICON.md). Do-PFN and CausalFM both run fine on CPU, just slower than on a GPU.
+Apple Silicon Macs: all three foundation models run on CPU, just slower than on a GPU. (CausalPFN's 0.1.4 PyPI release segfaults on Apple Silicon; the pinned commit fixes it. See [`docs/APPLE_SILICON.md`](docs/APPLE_SILICON.md).)
 
 `scripts/run_benchmark.py` needs all four dependency groups above installed at once (it runs all 9 models), plus `git clone`s of Do-PFN and CausalFM-toolkit under `notebooks/` (same layout the sandbox notebook uses).
 
@@ -183,14 +184,11 @@ ate_hat = float(np.asarray(ate_estimator.estimate_ate()).reshape(-1)[0])
 If you find this repository useful, please cite the paper as follows
 
 ```bibtex
-@misc{stith2026causalfoundationmodels,
+@article{stith2026causalfoundationmodels,
       title={Causal Foundation Models}, 
       author={Christopher Stith and Hossein Rahmani and Jesse C. Cresswell},
       year={2026},
-      eprint={2609.03003},
-      archivePrefix={arXiv},
-      primaryClass={cs.LG},
-      url={https://arxiv.org/abs/2609.03003}, 
+      journal={arXiv:2609.03003}
 }
 ```
 

@@ -1,9 +1,15 @@
 # CausalPFN on Apple Silicon
 
+**Status: fixed upstream.** CausalPFN runs natively on macOS/arm64 as of
+[vdblm/CausalPFN#14](https://github.com/vdblm/CausalPFN/pull/14) (commit
+`896a261`), which this repo pins in `pyproject.toml` / `requirements.txt`. The
+0.1.4 PyPI release predates the fix and still segfaults; if you see a crash on a
+Mac, your environment has that release — re-run `uv sync`.
+
 `import causalpfn` used to segfault the interpreter on macOS/arm64, and this
 repo reported the model unavailable there. The cause is not CausalPFN, and not
 the unstable `scaled_dot_product_attention` kernel this repo previously
-guessed at.
+guessed at. The rest of this page is the diagnosis, kept for the record.
 
 ## The actual fault
 
@@ -33,35 +39,31 @@ Two independent confirmations:
 
 ## The fix
 
-CausalPFN touches faiss in exactly one place — `IndexFlatL2(1)`, an exact
+CausalPFN touched faiss in exactly one place — `IndexFlatL2(1)`, an exact
 brute-force k-NN over **one-dimensional** weak-learner effect estimates, in
-`CausalEstimator._predict_cepo`. `causal_bench/faiss_shim.py` reimplements that
-in NumPy, and `causal_bench/__init__.py` registers it as `faiss` on Darwin/arm64
-before causalpfn can import the real one. One OpenMP runtime, no crash, and
-torch keeps all its threads.
+`CausalEstimator._predict_cepo`. Upstream #14 replaced it with a small NumPy
+helper (`causalpfn._nearest_neighbors.nearest_indices_1d`) and dropped the
+`faiss-cpu` dependency, so only torch's OpenMP runtime ever loads.
 
-Import `causal_bench` **before** `faiss` or `causalpfn`. Opt out with
-`CFMS_NO_FAISS_SHIM=1`.
+Until then, this repo carried an equivalent NumPy shim
+(`causal_bench/faiss_shim.py`, registered as `faiss` on Darwin/arm64 before
+causalpfn could import the real one, plus inline copies in the notebooks). It
+was removed once the upstream fix merged.
 
 ### Rejected alternatives
 
 | Approach | Why not |
 |---|---|
-| `OMP_NUM_THREADS=1` | Works, but serializes torch across every core to avoid a conflict that lives in a k-NN call. ~1.5x slower than the shim. |
+| `OMP_NUM_THREADS=1` | Works, but serializes torch across every core to avoid a conflict that lives in a k-NN call. ~1.5x slower than a NumPy k-NN. |
 | `KMP_DUPLICATE_LIB_OK=TRUE` | LLVM's own runtime calls this "unsafe, unsupported, undocumented" and warns it "may cause crashes or silently produce incorrect results". Disqualifying for anything whose numbers get reported. |
 
 ## Verification
 
-`tests/test_faiss_shim.py` cross-checks the shim against real faiss 1.15.0 in a
-**torch-free subprocess** — the only place the two libraries can coexist on this
-platform — across 7 shapes covering `k > ntotal`, ties, and multi-dimensional
-inputs. Neighbour sets, squared distances and the `-1`/`FLT_MAX` sentinels all
-match.
+Upstream's own test suite compares its NumPy k-NN against a brute-force reference and runs an Apple
+Silicon CI job.
 
-End to end inside CausalPFN, with the same seed and context, the shim produces
-**bitwise-identical** CATE across 1500 query points.
-
-`data/lalonde_macos_replication.json` re-runs the paper's own RealCause-Lalonde
+`data/lalonde_macos_replication.json` (produced with this repo's former shim,
+which matched real faiss bitwise) re-runs the paper's own RealCause-Lalonde
 benchmark (10 realizations per cohort) on Darwin 25.6.0 / arm64 / torch 2.12.1
 and lands on the published numbers:
 
