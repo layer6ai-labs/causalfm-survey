@@ -1,8 +1,8 @@
-"""CausalPFN can report credible intervals; upstream's public API for it is broken.
+"""CausalPFN can report credible intervals.
 
-`causalpfn.CATEEstimator.estimate_ate_CI` reads `output["ate"]` from a helper
-that never sets that key, so it raises KeyError on every call. The helper is
-fine, so `CausalPFNWrapper.estimate_att_ci` calls it directly.
+`causalpfn.CATEEstimator.estimate_ate_CI` raised KeyError on every call in the
+0.1.4 PyPI release; vdblm/CausalPFN#14 fixed it, and this repo pins a commit
+that includes the fix. `CausalPFNWrapper.estimate_att_ci` relies on it.
 
 Without intervals `coverage_95` cannot be computed for this model, which is why
 that column is empty for CausalPFN in `data/benchmark_results_*.csv`.
@@ -35,16 +35,17 @@ def _data(true_effect, n_c=900, n_t=150, seed=1):
     return X, T, Y
 
 
-def test_upstream_estimate_ate_ci_is_still_broken():
-    """If this starts failing, causalpfn fixed the bug and the workaround in
-    `estimate_att_ci` can be replaced with the public call."""
+def test_upstream_estimate_ate_ci_works():
+    """Fails with KeyError on the 0.1.4 PyPI release: a sign the installed
+    causalpfn predates the pinned commit (re-run `uv sync`)."""
     from causalpfn import CATEEstimator
 
     X, T, Y = _data(0.0, n_c=300, n_t=60)
     est = CATEEstimator(device="cpu", verbose=False, num_neighbours=60)
     est.fit(X, T, Y)
-    with pytest.raises(KeyError, match="ate"):
-        est.estimate_ate_CI(X[T == 1], alpha=0.05, n_samples=64)
+    out = est.estimate_ate_CI(X[T == 1], alpha=0.05, n_samples=64)
+    assert out["ate"] == est.estimate_ate(X[T == 1])
+    assert out["lower_bound"][0] <= out["upper_bound"][0]
 
 
 @pytest.mark.slow

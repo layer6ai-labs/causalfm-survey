@@ -22,7 +22,10 @@ dependencies = [
     "nbformat",
     "jupyter",
     "torch<2.10",
-    "causalpfn",
+    # Pinned to the upstream commit that fixes the Apple Silicon segfault and
+    # estimate_ate_CI (vdblm/CausalPFN#14); the 0.1.4 PyPI release predates it.
+    # Switch back to a plain version pin once a newer release is published.
+    "causalpfn @ git+https://github.com/vdblm/CausalPFN@896a2617adbf9bec1cb2ea0926ca4a28fc48990b",
 ]
 
 [project.optional-dependencies]

@@ -1,9 +1,9 @@
 """CausalPFN must actually run on Apple Silicon, not merely report available.
 
-Upstream reports CausalPFN unavailable on macOS/arm64 because importing it
-segfaults. `causal_bench.macos_compat` removes the duplicate OpenMP runtime
-that causes it, so these tests assert the platform genuinely works: the wrapper
-returns available, and it recovers a known treatment effect.
+The 0.1.4 PyPI release segfaults on macOS/arm64 (faiss and torch load two
+OpenMP runtimes). vdblm/CausalPFN#14 dropped faiss, and this repo pins a commit
+that includes the fix, so these tests assert the platform genuinely works: the
+wrapper returns available, and it recovers a known treatment effect.
 
 Marked `slow` -- the first run downloads ~75MB of pretrained weights.
 """
@@ -13,15 +13,11 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from causal_bench import CausalPFNWrapper, needs_faiss_shim, shim_active
+from causal_bench import CausalPFNWrapper
 
 pytestmark = pytest.mark.skipif(
     not CausalPFNWrapper.is_available(), reason="causalpfn not installed"
 )
-
-
-def test_shim_is_active_where_it_is_needed():
-    assert shim_active() == needs_faiss_shim()
 
 
 def _known_effect_dataset(n=1200, seed=3):
@@ -51,8 +47,8 @@ def test_recovers_a_known_confounded_effect():
 
 @pytest.mark.slow
 def test_estimates_are_deterministic_across_calls():
-    """The shim must not introduce run-to-run drift: two fits on identical
-    inputs have to agree exactly, or nothing built on top is reproducible."""
+    """Two fits on identical inputs have to agree exactly, or nothing built
+    on top is reproducible."""
     X, T, Y, _ = _known_effect_dataset(n=600, seed=5)
     a = CausalPFNWrapper(device="cpu")
     a.fit(X, T, Y)

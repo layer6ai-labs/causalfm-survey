@@ -3,7 +3,11 @@ numpy
 pandas
 matplotlib
 scikit-learn
-torch
+torch<2.10
+
+# Pinned to the upstream commit that fixes the Apple Silicon segfault and
+# estimate_ate_CI (vdblm/CausalPFN#14); the 0.1.4 PyPI release predates it.
+causalpfn @ git+https://github.com/vdblm/CausalPFN@896a2617adbf9bec1cb2ea0926ca4a28fc48990b
 
 # Metalearners (S/T/X-learner, Debiased ML, IPW, DR)
 econml>=0.14.0
@@ -20,7 +24,6 @@ nbformat
 jupyter
 
 # Model-specific packages are installed inside notebooks as needed:
-#   - causalpfn          (pip install causalpfn)
 #   - Do-PFN             (git clone; NOT `pip install -r Do-PFN/requirements.txt`
 #                        as-is -- pins catboost==1.1.1, no wheel for recent
 #                        Python, and DoPFNRegressor doesn't even import it.
