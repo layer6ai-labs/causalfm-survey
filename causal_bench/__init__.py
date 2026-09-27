@@ -1,3 +1,5 @@
+"""Evaluation library and model wrappers for the CFM benchmark."""
+
 from .data_generators import (
     SyntheticDataset,
     get_dataset,

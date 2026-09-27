@@ -6,15 +6,14 @@ CausalPFN: Balazadeh et al., "CausalPFN: Amortized Causal Effect Estimation
 via In-Context Learning", arXiv:2506.07918.
 
 Install:
-    pip install causalpfn
+    pip install "git+https://github.com/vdblm/CausalPFN"
 
 The first call downloads pretrained weights from the Hugging Face Hub
 (~ a few hundred MB), so an internet connection is required on first run.
 """
 
 from __future__ import annotations
-import platform
-import warnings
+from typing import Optional
 import numpy as np
 
 from .wrap_foundation import Prediction, _StandardizedFoundationWrapper
@@ -31,6 +30,8 @@ class CausalPFNWrapper(_StandardizedFoundationWrapper):
         max_query_length: int = 4096,
         num_neighbours: int = 1024,
         cap_num_neighbours: bool = True,
+        alpha: Optional[float] = None,
+        interval_n_samples: int = 10_000,
     ):
         for name, value in (
             ("max_context_length", max_context_length),
@@ -55,6 +56,12 @@ class CausalPFNWrapper(_StandardizedFoundationWrapper):
         self.max_query_length = int(max_query_length)
         self.num_neighbours = int(num_neighbours)
         self.cap_num_neighbours = bool(cap_num_neighbours)
+        if alpha is not None and not (0.0 < float(alpha) < 1.0):
+            raise ValueError(f"alpha must be in (0, 1), got {alpha!r}")
+        self.alpha = None if alpha is None else float(alpha)
+        if not isinstance(interval_n_samples, (int, np.integer)) or interval_n_samples <= 0:
+            raise ValueError("interval_n_samples must be a positive integer")
+        self.interval_n_samples = int(interval_n_samples)
         self._effective_num_neighbours = None
         self._cate_estimator = None
         self._ate_estimator = None
@@ -73,13 +80,6 @@ class CausalPFNWrapper(_StandardizedFoundationWrapper):
 
     @classmethod
     def is_available(cls) -> bool:
-        # CausalPFN segfaults on Apple Silicon macOS -- a hard process crash,
-        # not a catchable exception -- on both CPU and MPS (likely an
-        # unstable scaled_dot_product_attention kernel, not a CUDA
-        # requirement). Report unavailable here rather than let `fit()`
-        # crash the interpreter. Fine on Colab (CPU or GPU).
-        if platform.system() == "Darwin" and platform.machine() == "arm64":
-            return False
         try:
             from causalpfn import CATEEstimator, ATEEstimator  # noqa: F401
 
@@ -99,10 +99,10 @@ class CausalPFNWrapper(_StandardizedFoundationWrapper):
         are out of that distribution. Only a linear rescaling, so CATE/ATE are
         converted back to the original outcome scale in `predict`/`estimate_ate`.
 
-        CausalPFN 0.1.4 asks FAISS for ``num_neighbours`` from each arm even
-        when an arm is smaller, in which case FAISS returns -1 sentinels. By
-        default this wrapper caps k to the smaller arm and half the context
-        limit; set ``cap_num_neighbours=False`` only for exact upstream behavior.
+        By default this wrapper caps k to the *smaller* arm and half the
+        context limit, which is how ``data/benchmark_results_*.csv`` were
+        produced. Upstream caps each arm separately instead; set
+        ``cap_num_neighbours=False`` to get exactly that behavior.
         """
         self._reset_fit_state()
         X_arr, T_arr, Y_arr = self._validate_fit_data(X, T, Y)
@@ -118,18 +118,6 @@ class CausalPFNWrapper(_StandardizedFoundationWrapper):
             )
         else:
             self._effective_num_neighbours = self.num_neighbours
-            if (
-                self.num_neighbours > min_arm_size
-                or 2 * self.num_neighbours > self.max_context_length
-            ):
-                warnings.warn(
-                    "cap_num_neighbours=False preserves upstream behavior, but the "
-                    "requested k exceeds an arm size or half the context limit; "
-                    "FAISS can return -1 sentinel neighbors or CausalPFN can exceed "
-                    "max_context_length.",
-                    RuntimeWarning,
-                    stacklevel=2,
-                )
 
         self._X_train, self._Y_train = self._fit_scalers(X_arr, Y_arr)
         self._T_train = T_arr
@@ -170,10 +158,50 @@ class CausalPFNWrapper(_StandardizedFoundationWrapper):
         return self._ate_estimator
 
     def predict(self, X: np.ndarray) -> Prediction:
-        """Return CATE predictions and optional interval placeholders."""
+        """Return CATE predictions, with credible intervals when asked for.
+
+        Intervals are off by default because they cost an extra forward pass
+        over ``2 * len(X)`` query rows drawing ``interval_n_samples`` posterior
+        draws each. Pass ``alpha`` to the constructor to turn them on; without
+        them ``coverage_95`` cannot be computed for this model, which is why
+        that column is blank for CausalPFN in ``data/benchmark_results_*.csv``.
+        """
         X_s = self._transform_x(X)
-        tau_hat_s = np.asarray(self._ensure_cate_estimator().estimate_cate(X_s)).reshape(-1)
-        return self._unscale_effect(tau_hat_s), None, None
+        estimator = self._ensure_cate_estimator()
+        tau_hat_s = np.asarray(estimator.estimate_cate(X_s)).reshape(-1)
+        tau_hat = self._unscale_effect(tau_hat_s)
+        if self.alpha is None:
+            return tau_hat, None, None
+
+        bounds = estimator.estimate_cate_CI(
+            X_s, alpha=self.alpha, n_samples=self.interval_n_samples
+        )
+        lower = self._unscale_effect(np.asarray(bounds["lower_bound"]).reshape(-1))
+        upper = self._unscale_effect(np.asarray(bounds["upper_bound"]).reshape(-1))
+        return tau_hat, lower, upper
+
+    def estimate_att_ci(
+        self, X: np.ndarray, alpha: float = 0.05, n_samples: Optional[int] = None
+    ) -> tuple[float, float, float]:
+        """Point estimate and credible interval for the mean effect over ``X``.
+
+        Query ``X`` at the treated rows and this is the ATT; query it at
+        everything and it is the ATE. The interval is the posterior over the
+        *mean* effect, which is narrower than averaging per-unit intervals and
+        is the quantity a "how big could this be?" question wants.
+        """
+        X_s = self._transform_x(X)
+        out = self._ensure_cate_estimator().estimate_ate_CI(
+            X_s, alpha=alpha, n_samples=n_samples or self.interval_n_samples
+        )
+        point = float(np.asarray(out["ate"]).reshape(-1)[0])
+        lo = float(np.asarray(out["lower_bound"]).reshape(-1)[0])
+        hi = float(np.asarray(out["upper_bound"]).reshape(-1)[0])
+        return (
+            float(self._unscale_effect(point)),
+            float(self._unscale_effect(lo)),
+            float(self._unscale_effect(hi)),
+        )
 
     def estimate_ate(self, X: np.ndarray, T: np.ndarray, Y: np.ndarray) -> float:
         ate_hat_s = float(np.asarray(self._ensure_ate_estimator().estimate_ate()).reshape(-1)[0])
