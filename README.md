@@ -44,7 +44,7 @@ for per-model dependency installs).
 Ensure you have `python >=3.10,<3.13`.
 
 ```bash
-# With uv (recommended): everything -- core, metalearners, CausalFM deps, pytest
+# With uv (recommended): everything -- core, metalearners, CausalFM deps
 uv sync --all-extras
 
 # Or with pip:

@@ -61,7 +61,6 @@ dev-dependencies = [
     "black",
     "ruff",
     "mypy",
-    "pytest",
 ]
 # shap/sparse (via econml and causalml) depend on numba with no lower bound,
 # so the lockfile otherwise resolves numba 0.53.1 / llvmlite 0.36.0, which
@@ -70,12 +69,6 @@ dev-dependencies = [
 constraint-dependencies = [
     "numba>=0.59",
     "llvmlite>=0.42",
-]
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-markers = [
-    "slow: downloads pretrained weights or runs a full model pass",
 ]
 
 [tool.ruff]

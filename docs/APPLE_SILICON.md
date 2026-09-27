@@ -59,9 +59,7 @@ was removed once the upstream fix merged.
 
 ## Verification
 
-`tests/test_causalpfn_macos.py` runs CausalPFN end to end on arm64 and checks
-it recovers a known confounded effect deterministically. Upstream's own test
-suite compares its NumPy k-NN against a brute-force reference and runs an Apple
+Upstream's own test suite compares its NumPy k-NN against a brute-force reference and runs an Apple
 Silicon CI job.
 
 `data/lalonde_macos_replication.json` (produced with this repo's former shim,
