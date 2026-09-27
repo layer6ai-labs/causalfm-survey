@@ -5,9 +5,8 @@ a common `.fit(X, T, Y)` / `.predict(X)` interface for the benchmark.
 CausalPFN: Balazadeh et al., "CausalPFN: Amortized Causal Effect Estimation
 via In-Context Learning", arXiv:2506.07918.
 
-Install (pinned to an upstream commit until a release newer than 0.1.4 is on
-PyPI -- see pyproject.toml):
-    pip install "causalpfn @ git+https://github.com/vdblm/CausalPFN@896a2617adbf9bec1cb2ea0926ca4a28fc48990b"
+Install:
+    pip install "git+https://github.com/vdblm/CausalPFN"
 
 The first call downloads pretrained weights from the Hugging Face Hub
 (~ a few hundred MB), so an internet connection is required on first run.
