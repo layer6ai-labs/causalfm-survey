@@ -93,7 +93,7 @@ Every notebook's Colab install cells (`%pip install ...`) silently no-op in this
 - **CausalFM**: `uv pip install einops "tabpfn==2.0.9" tensorboard`. CausalFM is also not on PyPI, cloned automatically
 - **Metalearners**: `uv pip install econml causalml "FLAML[automl]==2.3.5"`.
 
-Apple Silicon Macs: all three foundation models run on CPU, just slower than on a GPU. (CausalPFN's 0.1.4 PyPI release segfaults on Apple Silicon; the pinned commit fixes it. See [`docs/APPLE_SILICON.md`](docs/APPLE_SILICON.md).)
+Apple Silicon Macs: all three foundation models run on CPU, just slower than on a GPU. (CausalPFN's 0.1.4 PyPI release segfaults on Apple Silicon; the pinned commit fixes it.)
 
 `scripts/run_benchmark.py` needs all four dependency groups above installed at once (it runs all 9 models), plus `git clone`s of Do-PFN and CausalFM-toolkit under `notebooks/` (same layout the sandbox notebook uses).
 
