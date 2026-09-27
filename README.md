@@ -44,8 +44,8 @@ for per-model dependency installs).
 Ensure you have `python >=3.10,<3.13`.
 
 ```bash
-# With uv (recommended):
-uv sync
+# With uv (recommended): everything -- core, metalearners, CausalFM deps, pytest
+uv sync --all-extras
 
 # Or with pip:
 pip install -r requirements.txt
@@ -86,7 +86,7 @@ Loads the full production run's output (already checked into `data/benchmark_res
 
 ### Running notebooks locally
 
-Every notebook's Colab install cells (`%pip install ...`) silently no-op in this repo's local `uv`-managed venv (it has no `pip` module) — install what you need yourself first, with `uv pip install <pkg>` :
+Every notebook's Colab install cells (`%pip install ...`) silently no-op in this repo's local `uv`-managed venv (it has no `pip` module). `uv sync --all-extras` installs everything below except Do-PFN's `networkx` (already pulled in by torch) and the two `git clone`s; to install a single group by hand instead:
 
 - **CausalPFN**: already a core dependency (`uv sync`), pinned to an upstream commit because the 0.1.4 PyPI release predates its Apple Silicon fix. Standalone: `uv pip install "causalpfn @ git+https://github.com/vdblm/CausalPFN@896a2617adbf9bec1cb2ea0926ca4a28fc48990b"`
 - **Do-PFN**: `uv pip install networkx tqdm einops "torch<2.10"`. Do-PFN is not on PyPI, notebooks `git clone` it automatically; `torch<2.10` is required (Do-PFN breaks on newer)

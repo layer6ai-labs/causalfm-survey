@@ -33,7 +33,4 @@ jupyter
 #                        + einops, tabpfn==2.0.9, tensorboard
 #                        (do NOT install the toolkit's own requirements.txt
 #                        as-is -- it's a frozen dev env with Linux/CUDA-only
-#                        pins. Locally: `uv pip install einops "tabpfn==2.0.9"
-#                        tensorboard` -- NOT `uv sync --extra causalfm`, which
-#                        reconciles the whole env and uninstalls anything
-#                        installed ad hoc outside the declared extras.)
+#                        pins. With uv, `uv sync --all-extras` covers these.)
