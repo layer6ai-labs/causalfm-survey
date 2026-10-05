@@ -22,10 +22,9 @@ dependencies = [
     "nbformat",
     "jupyter",
     "torch<2.10",
-    # Pinned to the upstream commit that fixes the Apple Silicon segfault and
-    # estimate_ate_CI (vdblm/CausalPFN#14); the 0.1.4 PyPI release predates it.
-    # Switch back to a plain version pin once a newer release is published.
-    "causalpfn @ git+https://github.com/vdblm/CausalPFN@896a2617adbf9bec1cb2ea0926ca4a28fc48990b",
+    # 0.1.5 is the first release with the Apple Silicon segfault and
+    # estimate_ate_CI fixes (vdblm/CausalPFN#14, #15); 0.1.4 has neither.
+    "causalpfn>=0.1.5",
 ]
 
 [project.optional-dependencies]
@@ -48,10 +47,6 @@ dev = [
     "ruff",
     "mypy",
 ]
-
-# Needed for the git-pinned causalpfn dependency above.
-[tool.hatch.metadata]
-allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
 packages = ["causal_bench"]

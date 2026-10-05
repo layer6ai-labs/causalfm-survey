@@ -307,8 +307,8 @@ wheels = [
 
 [[package]]
 name = "causalpfn"
-version = "0.1.4"
-source = { git = "https://github.com/vdblm/CausalPFN?rev=896a2617adbf9bec1cb2ea0926ca4a28fc48990b#896a2617adbf9bec1cb2ea0926ca4a28fc48990b" }
+version = "0.1.5"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "huggingface-hub" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
@@ -317,6 +317,10 @@ dependencies = [
     { name = "scikit-learn" },
     { name = "torch" },
     { name = "tqdm" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/33/0e/0ce66b258ddb57fbec2655f9bfcc513428410d79361f61699237f3c16805/causalpfn-0.1.5.tar.gz", hash = "sha256:d0af643a819e45613b91d355f82257c7d3196e195cea0be71997760588cfd6a2", size = 32803, upload-time = "2026-09-27T18:52:28.341Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c8/b3/fa919f219b8028a4d44c9de95832927eb87b9c8e7bf46bcc2adbdf55e1e5/causalpfn-0.1.5-py3-none-any.whl", hash = "sha256:c129280a40bdf1b5639ec9ecdf91a308f539c80d93990a9d997b886cd9a08d8f", size = 29204, upload-time = "2026-09-27T18:52:26.667Z" },
 ]
 
 [[package]]
@@ -424,7 +428,7 @@ dev = [
 requires-dist = [
     { name = "black", marker = "extra == 'dev'" },
     { name = "causalml", marker = "extra == 'metalearners'", specifier = ">=0.14.0" },
-    { name = "causalpfn", git = "https://github.com/vdblm/CausalPFN?rev=896a2617adbf9bec1cb2ea0926ca4a28fc48990b" },
+    { name = "causalpfn", specifier = ">=0.1.5" },
     { name = "econml", marker = "extra == 'metalearners'", specifier = ">=0.14.0" },
     { name = "einops", marker = "extra == 'causalfm'" },
     { name = "flaml", extras = ["automl"], marker = "extra == 'metalearners'", specifier = "==2.3.5" },

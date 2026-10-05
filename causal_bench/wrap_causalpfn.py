@@ -6,7 +6,7 @@ CausalPFN: Balazadeh et al., "CausalPFN: Amortized Causal Effect Estimation
 via In-Context Learning", arXiv:2506.07918.
 
 Install:
-    pip install "git+https://github.com/vdblm/CausalPFN"
+    pip install "causalpfn>=0.1.5"
 
 The first call downloads pretrained weights from the Hugging Face Hub
 (~ a few hundred MB), so an internet connection is required on first run.

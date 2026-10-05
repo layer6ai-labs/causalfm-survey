@@ -88,12 +88,12 @@ Loads the full production run's output (already checked into `data/benchmark_res
 
 Every notebook's Colab install cells (`%pip install ...`) silently no-op in this repo's local `uv`-managed venv (it has no `pip` module). `uv sync --all-extras` installs everything below except Do-PFN's `networkx` (already pulled in by torch) and the two `git clone`s; to install a single group by hand instead:
 
-- **CausalPFN**: already a core dependency (`uv sync`), pinned to an upstream commit because the 0.1.4 PyPI release predates its Apple Silicon fix. Standalone: `uv pip install "causalpfn @ git+https://github.com/vdblm/CausalPFN@896a2617adbf9bec1cb2ea0926ca4a28fc48990b"`
+- **CausalPFN**: already a core dependency (`uv sync`), `causalpfn>=0.1.5` from PyPI (0.1.4 predates its Apple Silicon fix). Standalone: `uv pip install "causalpfn>=0.1.5"`
 - **Do-PFN**: `uv pip install networkx tqdm einops "torch<2.10"`. Do-PFN is not on PyPI, notebooks `git clone` it automatically; `torch<2.10` is required (Do-PFN breaks on newer)
 - **CausalFM**: `uv pip install einops "tabpfn==2.0.9" tensorboard`. CausalFM is also not on PyPI, cloned automatically
 - **Metalearners**: `uv pip install econml causalml "FLAML[automl]==2.3.5"`.
 
-Apple Silicon Macs: all three foundation models run on CPU, just slower than on a GPU. (CausalPFN's 0.1.4 PyPI release segfaults on Apple Silicon; the pinned commit fixes it.)
+Apple Silicon Macs: all three foundation models run on CPU, just slower than on a GPU. (CausalPFN's 0.1.4 PyPI release segfaults on Apple Silicon; 0.1.5 fixes it.)
 
 `scripts/run_benchmark.py` needs all four dependency groups above installed at once (it runs all 9 models), plus `git clone`s of Do-PFN and CausalFM-toolkit under `notebooks/` (same layout the sandbox notebook uses).
 
